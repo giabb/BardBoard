@@ -27,7 +27,7 @@
     "discordjs"
   ],
   "author": "github.com/giabb",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Soundboard for DND sessions (or whatever you like)",
   "dependencies": {
     "@discordjs/voice": "^0.17.0",
