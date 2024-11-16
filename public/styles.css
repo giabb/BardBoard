@@ -1,0 +1,198 @@
+/*
+    BardBoard - A DiscordJS bot soundboard
+    Copyright (C) 2024 Giovanbattista Abbate
+  
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+  
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+  
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.  
+*/
+
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    padding-top: 60px;
+    background-color: #F4E1D2;
+    color: #333333;
+}
+
+a:link {
+    color: green;
+    background-color: transparent;
+    text-decoration: none;
+  }
+  
+a:visited {
+color: pink;
+background-color: transparent;
+text-decoration: none;
+}
+
+a:hover {
+color: red;
+background-color: transparent;
+text-decoration: underline;
+}
+
+a:active {
+color: yellow;
+background-color: transparent;
+text-decoration: underline;
+}
+
+h1 {
+    color: #4A0E4E;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+.navbar {
+    background-color: #4A0E4E !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.8rem;
+    color: #FFD700 !important;
+}
+
+.control-panel {
+    background: #F4E1D2;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: none; 
+    text-align: center;
+}
+
+.footer {
+    background-color: #4A0E4E;
+    color: #FFD700;
+    padding: 15px;
+    font-size: 0.9rem; 
+}
+
+.toggle-button {
+    background-color: #f0f0f0;
+    border: none;
+    padding: 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.3s, transform 0.2s;
+    font-size: 1.2rem;
+
+}
+
+.toggle-button:hover {
+    background-color: #c5c5c5;
+    transform: scale(1.05);
+}
+
+.toggle-button.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.toggle-button .icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    flex-shrink: 0;
+}
+
+.status {
+    margin-top: 10px;
+    color: #666;
+}
+
+#audioButtons .btn {
+    border-radius: 8px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    background-color: #228B22;
+    border-color: #228B22;
+    color: #F4E1D2;
+    font-weight: bold;
+}
+
+#audioButtons .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background-color: #1A6B1A;
+    border-color: #1A6B1A;
+}
+
+#staticButtonContainer {
+    margin-top: 35px;
+}
+
+#stopButton {
+    background-color: #e42914;
+    color: white;
+    font-size: 1.2rem;
+    padding: 1rem;
+}
+
+#stopButton:hover {
+    background-color: #d61500;
+}
+
+#stopButton .icon {
+    width: 24px;
+    height: 24px;
+}
+
+#volumeSlider {
+    width: 150px;
+    height: 8px;
+    background-color: #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#volumeSlider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+}
+
+#volumeSlider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding-top: 80px;
+    }
+    .navbar-brand {
+        font-size: 1.4rem;
+    }
+    #audioButtons .btn {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+}
+
