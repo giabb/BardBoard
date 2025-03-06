@@ -70,6 +70,7 @@ The `@discordjs/opus` package is affected by [CVE-2024-21521 vulnerability](http
 ## Roadmap
 
 Coming soon:
+- Song name shown
 - Extended audio format support
 - More customization options
 - Improve frontend (...maybe :D)
