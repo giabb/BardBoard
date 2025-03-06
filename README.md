@@ -7,15 +7,18 @@ A simple Discord soundboard bot that enhances your D&D sessions (or whatever you
 Simply click any button on the interface to play the corresponding sound in your Discord channel – perfect for adding ambiance or just making some noise!
 
 ## Table of Contents
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Setup Guide](#setup-guide)
-  - [Docker Installation](#docker-installation)
-  - [Manual Installation](#manual-installation)
-- [Roadmap](#roadmap)
-- [Contributors](#contributors)
-- [License](#license)
-- [Credits](#credits)
+- [BardBoard \& Dragons](#bardboard--dragons)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Prerequisites](#prerequisites)
+  - [Setup Guide](#setup-guide)
+    - [Docker Installation](#docker-installation)
+    - [Manual Installation](#manual-installation)
+  - [Known Issues](#known-issues)
+  - [Roadmap](#roadmap)
+  - [Contributors](#contributors)
+  - [License](#license)
+  - [Credits](#credits)
 
 ## Overview
 
@@ -32,12 +35,12 @@ Choose your preferred installation method:
 - Node.js 22.11.0+
 - npm 10.9.0+
 - Key dependencies:
-  - express 4.21.1+
-  - discord.js 14.15.3+
-  - @discordjs/voice: 0.17.0+
-  - @discordjs/opus: 0.9.0+
-  - libsodium-wrappers 0.7.13+
-  - dotenv 16.4.5+
+  - express 4.21.2+
+  - discord.js 14.18.0+
+  - @discordjs/voice: 0.18.0+
+  - @discordjs/opus: 0.10.0+
+  - libsodium-wrappers 0.7.15+
+  - dotenv 16.4.7+
 
 ## Setup Guide
 
@@ -65,7 +68,7 @@ Before installation, you'll need to configure your environment:
 
 ## Known Issues
 
-The `@discordjs/opus` package is affected by [CVE-2024-21521 vulnerability](https://security.snyk.io/vuln/SNYK-JS-DISCORDJSOPUS-6370643). Since this bot is self-hosted and will be accessible only from the local network, we can safely ignore this DoS vulnerability. If you have something in mind to solve it, just submit a PR.
+None
 
 ## Roadmap
 
