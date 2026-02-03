@@ -1,16 +1,4 @@
 {
-  "//": "BardBoard - A DiscordJS bot soundboard",
-  "//": "Copyright (C) 2024 Giovanbattista Abbate",
-  "//": "This program is free software: you can redistribute it and/or modify",
-  "//": "it under the terms of the GNU General Public License as published by",
-  "//": "the Free Software Foundation, either version 3 of the License, or",
-  "//": "(at your option) any later version.",
-  "//": "This program is distributed in the hope that it will be useful,",
-  "//": "but WITHOUT ANY WARRANTY; without even the implied warranty of",
-  "//": "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the",
-  "//": "GNU General Public License for more details.",
-  "//": "You should have received a copy of the GNU General Public License",
-  "//": "along with this program.  If not, see <https://www.gnu.org/licenses/>.",
   "name": "bardboardjs",
   "version": "1.0.0",
   "main": "BardBoard.js",
@@ -30,11 +18,13 @@
   "license": "GPL-3.0-or-later",
   "description": "Soundboard for DND sessions (or whatever you like)",
   "dependencies": {
-    "@discordjs/voice": "^0.18.0",
+    "@discordjs/voice": "^0.19.0",
     "@discordjs/opus": "^0.10.0",
-    "discord.js": "^14.18.0",
-    "express": "^4.21.2",
-    "libsodium-wrappers": "^0.7.15",
-    "dotenv": "^16.4.7"
+    "discord.js": "^14.25.1",
+    "express": "^5.2.1",
+    "libsodium-wrappers": "^0.8.2",
+    "dotenv": "^17.2.3",
+    "music-metadata": "^11.11.2",
+    "@snazzah/davey": "^0.1.9"
   }
 }

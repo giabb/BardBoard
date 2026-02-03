@@ -80,6 +80,16 @@
             <span class="np-label">Now Playing</span>
             <span class="np-divider">›</span>
             <span id="nowPlayingSong" class="np-song">Nothing playing</span>
+
+            <!-- progress row (hidden until a song is playing) -->
+            <div class="np-progress-row" id="npProgressRow">
+                <span class="np-time" id="npElapsed">0:00</span>
+                <div class="np-bar-track" id="npBarTrack">
+                    <div class="np-bar-fill" id="npBarFill"></div>
+                    <div class="np-bar-thumb" id="npBarThumb"></div>
+                </div>
+                <span class="np-time" id="npDuration">0:00</span>
+            </div>
         </div>
     </header>
 
@@ -166,32 +176,146 @@ document.getElementById('volumeSlider').addEventListener('input', function () {
 });
 
 // -------------------------------------------------------
-// Now-Playing polling & button highlight
+// Now-Playing polling, progress bar, seek
 // -------------------------------------------------------
+
+/** latest server payload — kept in module scope so the local ticker can read it */
+let npState = { song: null, elapsed: 0, duration: 0 };
+/** timestamp (performance.now) of the last successful poll */
+let npPollTime = 0;
+
+/**
+ * Formats seconds → "M:SS"
+ */
+function formatTime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Renders the progress bar and time labels from the current npState,
+ * optionally interpolating elapsed forward by `dt` seconds since last poll.
+ */
+function renderProgress(dt) {
+    const elapsed  = Math.min(npState.elapsed + (dt || 0), npState.duration);
+    const duration = npState.duration;
+    const pct      = duration > 0 ? (elapsed / duration) * 100 : 0;
+
+    document.getElementById('npElapsed').textContent  = formatTime(elapsed);
+    document.getElementById('npDuration').textContent = formatTime(duration);
+    document.getElementById('npBarFill').style.width  = pct + '%';
+    document.getElementById('npBarThumb').style.left  = pct + '%';
+}
+
+/**
+ * Polls /now-playing, updates song label + button highlights,
+ * shows/hides the progress row, and anchors the local interpolation ticker.
+ */
 function updateNowPlaying() {
     if (!window.ENV || !window.ENV.channelId) return;
 
     fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
         .then(r => r.json())
         .then(data => {
-            const songEl = document.getElementById('nowPlayingSong');
-            const barEl  = document.getElementById('nowPlayingBar');
+            const songEl    = document.getElementById('nowPlayingSong');
+            const barEl     = document.getElementById('nowPlayingBar');
+            const progRow   = document.getElementById('npProgressRow');
 
             document.querySelectorAll('.track-btn').forEach(b => b.classList.remove('playing'));
+
+            npState   = data;
+            npPollTime = performance.now();
 
             if (data.song) {
                 songEl.textContent = data.song;
                 barEl.classList.add('has-song');
+                progRow.classList.add('visible');
+
                 document.querySelectorAll('.track-btn').forEach(b => {
                     if (b.dataset.track === data.song) b.classList.add('playing');
                 });
+
+                renderProgress(0);
             } else {
                 songEl.textContent = 'Nothing playing';
                 barEl.classList.remove('has-song');
+                progRow.classList.remove('visible');
+                npState = { song: null, elapsed: 0, duration: 0 };
             }
         })
         .catch(err => console.error('now-playing poll error:', err));
 }
+
+/**
+ * Runs every 250 ms: interpolates elapsed forward from the last polled
+ * snapshot so the bar moves smoothly between 2-second server polls.
+ */
+setInterval(() => {
+    if (!npState.song) return;
+    const dt = (performance.now() - npPollTime) / 1000;
+    renderProgress(dt);
+}, 250);
+
+// -------------------------------------------------------
+// Seek interaction (click / drag on the progress bar)
+// -------------------------------------------------------
+(function setupSeek() {
+    const track = document.getElementById('npBarTrack');
+    let dragging = false;
+
+    function seekFromEvent(e) {
+        const rect  = track.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const target = ratio * npState.duration;
+
+        // optimistic local update so the bar jumps instantly
+        npState.elapsed = target;
+        npPollTime      = performance.now();
+        renderProgress(0);
+
+        // tell the server
+        fetch('/seek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: window.ENV.channelId, offsetSecs: target })
+        }).catch(err => console.error('seek error:', err));
+    }
+
+    track.addEventListener('mousedown', e => {
+        if (!npState.song) return;
+        dragging = true;
+        track.classList.add('dragging');
+        seekFromEvent(e);
+    });
+    window.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        seekFromEvent(e);
+    });
+    window.addEventListener('mouseup', () => {
+        dragging = false;
+        track.classList.remove('dragging');
+    });
+
+    // touch support
+    track.addEventListener('touchstart', e => {
+        if (!npState.song) return;
+        dragging = true;
+        track.classList.add('dragging');
+        seekFromEvent(e.touches[0]);
+        e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        seekFromEvent(e.touches[0]);
+        e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('touchend', () => {
+        dragging = false;
+        track.classList.remove('dragging');
+    });
+})();
 
 function syncRepeatState() {
     if (!window.ENV || !window.ENV.channelId) return;

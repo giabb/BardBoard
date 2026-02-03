@@ -19,9 +19,10 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Events, Client, GatewayIntentBits } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
 const sodium = require('libsodium-wrappers');
+const musicmetadata = require('music-metadata');
 const app = express();
 const discordClient = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 require('dotenv').config();
@@ -36,6 +37,8 @@ const repeatEnabled = new Map();
 const currentAudioFile = new Map();
 const currentVolume = new Map();
 const activeAudioResources = new Map();
+const playStartTime   = new Map();   // guildId → Date.now() when current track started
+const trackDurations  = new Map();   // fileName → duration in seconds (cached)
 
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from 'public' directory
@@ -137,22 +140,83 @@ app.post('/set-volume', (req, res) => {
 });
 
 /**
+ * Handles the `/seek` API endpoint to jump playback to a
+ * specific position within the currently playing track.
+ * Stops the current resource and replays from the requested offset
+ * using createAudioResource's built-in `start` option.
+ *
+ * @route POST /seek
+ * @param {string} channelId   - The ID of the Discord channel.
+ * @param {number} offsetSecs  - Target position in seconds.
+ */
+app.post('/seek', async (req, res) => {
+  const { channelId, offsetSecs } = req.body;
+  const channel = discordClient.channels.cache.get(channelId);
+  if (!channel) return res.sendStatus(404);
+
+  const guildId  = channel.guild.id;
+  const fileName = currentAudioFile.get(guildId);
+  const player   = activeAudioPlayers.get(guildId);
+  if (!fileName || !player) return res.sendStatus(404);
+
+  try {
+    const volume   = currentVolume.get(guildId) || 0.5;
+    const resource = createAudioResource(`./audio-files/${fileName}`, {
+      inlineVolume: true,
+      metadata: { title: fileName },
+      start: offsetSecs          // ← discordjs/voice native seek
+    });
+    resource.volume.setVolume(volume);
+
+    activeAudioResources.set(guildId, resource);
+    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);  // keep elapsed in sync
+    player.play(resource);
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Seek error:', err);
+    res.sendStatus(500);
+  }
+});
+
+/**
  * Handles the `/now-playing` API endpoint to return the name
- * of the currently playing audio file (without extension).
+ * of the currently playing audio file (without extension),
+ * plus elapsed seconds and total duration for the progress bar.
  *
  * @route GET /now-playing
  * @query  {string} channelId - The ID of the Discord channel.
- * @returns {{ song: string|null }} The current song name, or null.
+ * @returns {{ song: string|null, elapsed: number, duration: number }}
  */
-app.get('/now-playing', (req, res) => {
+app.get('/now-playing', async (req, res) => {
   const { channelId } = req.query;
   const channel = discordClient.channels.cache.get(channelId);
-  if (channel) {
-    const fileName = currentAudioFile.get(channel.guild.id) || null;
-    res.json({ song: fileName ? fileName.replace(/\.[^/.]+$/, '') : null });
-  } else {
-    res.json({ song: null });
+  if (!channel) return res.json({ song: null, elapsed: 0, duration: 0 });
+
+  const guildId  = channel.guild.id;
+  const fileName = currentAudioFile.get(guildId) || null;
+
+  if (!fileName) return res.json({ song: null, elapsed: 0, duration: 0 });
+
+  // --- duration (cached) ---
+  let duration = trackDurations.get(fileName);
+  if (duration === undefined) {
+    try {
+      const metadata = await musicmetadata.parseFile(`./audio-files/${fileName}`);
+      duration = metadata.format.duration || 0;
+    } catch { duration = 0; }
+    trackDurations.set(fileName, duration);
   }
+
+  // --- elapsed: wall-clock since playback started ---
+  const startedAt = playStartTime.get(guildId) || Date.now();
+  const elapsed   = Math.min((Date.now() - startedAt) / 1000, duration);
+
+  res.json({
+    song:     fileName.replace(/\.[^/.]+$/, ''),
+    elapsed:  Math.round(elapsed * 10) / 10,   // 1 decimal
+    duration: Math.round(duration * 10) / 10
+  });
 });
 
 /**
@@ -232,6 +296,7 @@ async function playAudioInDiscord(fileName, channelId) {
     activeAudioPlayers.set(channel.guild.id, player);
     activeAudioResources.set(channel.guild.id, resource);
 
+    playStartTime.set(channel.guild.id, Date.now());   // ← record when playback starts
     player.play(resource);
 
     // Handle repeat when audio ends
@@ -244,6 +309,7 @@ async function playAudioInDiscord(fileName, channelId) {
             const newResource = createAudioResource(`./audio-files/${currentFile}`, { inlineVolume: true });
             newResource.volume.setVolume(currentVolume.get(channel.guild.id) || 0.5);
             activeAudioResources.set(channel.guild.id, newResource);
+            playStartTime.set(channel.guild.id, Date.now());   // ← reset on repeat loop
             player.play(newResource);
           }
         } else {
@@ -353,6 +419,7 @@ function cleanupPlayerOnly(guildId) {
     player.removeAllListeners();
     activeAudioPlayers.delete(guildId);
     currentAudioFile.delete(guildId);
+    playStartTime.delete(guildId);
   }
 }
 
@@ -383,8 +450,8 @@ function cleanupResources(guildId) {
  *******************************************************/
 
 // Discord bot logic
-discordClient.on('ready', () => {
-  console.log(`Logged in as ${discordClient.user.tag}!`);
+discordClient.on(Events.ClientReady, () => {
+    console.log(`Logged in as ${discordClient.user.tag}!`);
 });
 
 discordClient.login(process.env.DISCORD_TOKEN);

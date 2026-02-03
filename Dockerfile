@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-FROM node:22-alpine
+FROM node:24-alpine
 
 RUN apk add --no-cache \
     python3 \

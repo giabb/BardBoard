@@ -233,6 +233,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
    ============================================= */
 .now-playing-strip {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     padding: 9px 24px;
@@ -263,6 +264,68 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     color: var(--gold-light);
     font-style: normal;
     font-weight: 600;
+}
+
+/* ── Progress row (seekable bar + timestamps) ── */
+.np-progress-row {
+    display: none;                          /* hidden until .visible */
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    padding-top: 8px;
+    margin-top: 2px;
+}
+.np-progress-row.visible { display: flex; }
+
+.np-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;     /* digits don't jump around */
+    min-width: 36px;
+    white-space: nowrap;
+}
+.np-time:last-child { text-align: right; }
+
+/* the clickable/draggable rail */
+.np-bar-track {
+    position: relative;
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: height 0.2s;
+}
+.np-bar-track:hover,
+.np-bar-track.dragging { height: 6px; }   /* fatten on hover / drag */
+
+/* filled portion */
+.np-bar-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-violet), var(--gold));
+    border-radius: 2px;
+    pointer-events: none;
+    transition: width 0.25s linear;
+}
+
+/* draggable thumb – invisible until hover/drag, then pops in */
+.np-bar-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 14px; height: 14px;
+    background: var(--gold-light);
+    box-shadow: 0 0 6px var(--gold-glow);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    transition: transform 0.15s, left 0.25s linear;
+}
+.np-bar-track:hover .np-bar-thumb,
+.np-bar-track.dragging .np-bar-thumb {
+    transform: translate(-50%, -50%) scale(1);
 }
 
 /* =============================================
