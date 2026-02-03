@@ -159,14 +159,38 @@ fetch('/audio-files')
             Object.keys(data.categories).forEach(folderName => {
                 const files = data.categories[folderName];
 
-                // Create Separator
+                // Create the Header with a toggle
                 const header = document.createElement('h2');
                 header.className = 'category-header';
-                header.innerHTML = `<span>${folderName}</span>`;
-                container.appendChild(header);
+                header.innerHTML = `
+                    <span>${folderName}</span>
+                    <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                `;
 
-                // Create Grid for this folder
-                container.appendChild(createGrid(files, globalCount));
+                // Create a wrapper for the collapsible effect
+                const wrapper = document.createElement('div');
+                wrapper.className = 'category-wrapper'; // Default state: Open
+
+                const inner = document.createElement('div');
+                inner.className = 'category-inner';
+
+                // Put the grid inside the inner wrapper
+                inner.appendChild(createGrid(files, globalCount));
+                wrapper.appendChild(inner);
+
+                // Add Click Event to Toggle
+                header.addEventListener('click', () => {
+                    // Toggle the 'collapsed' class on both header (for arrow rotation) and wrapper (for height)
+                    header.classList.toggle('collapsed');
+                    wrapper.classList.toggle('collapsed');
+                });
+
+                // Append everything to the main container
+                container.appendChild(header);
+                container.appendChild(wrapper);
+
                 globalCount += files.length;
             });
         }

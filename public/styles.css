@@ -511,3 +511,44 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     .ctrl-btn span { display: none; }   /* icon-only on tiny screens */
     .ctrl-btn     { padding: 8px 10px; }
 }
+
+/* =============================================
+   COLLAPSIBLE CATEGORIES
+   ============================================= */
+
+/* Make the header look clickable */
+.category-header {
+    cursor: pointer;
+    user-select: none; /* Prevent text selection while clicking */
+}
+
+/* Style the chevron/arrow icon */
+.cat-chevron {
+    width: 24px;
+    height: 24px;
+    opacity: 0.6;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    order: 2; /* Ensure it sits between text and the line if needed, or adjust flex */
+}
+
+/* Rotate the arrow when collapsed */
+.category-header.collapsed .cat-chevron {
+    transform: rotate(-90deg);
+}
+
+/* The wrapper that holds the grid for animation */
+.category-wrapper {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.3s cubic-bezier(.4,0,.2,1);
+}
+
+/* When collapsed, squeeze the row height to 0 */
+.category-wrapper.collapsed {
+    grid-template-rows: 0fr;
+}
+
+/* Required to hide content when grid-row is 0 */
+.category-inner {
+    overflow: hidden;
+}
