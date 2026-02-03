@@ -52,6 +52,19 @@ app.get('/env-config', (req, res) => {
   });
 });
 
+/**
+ * Handles the `/repeat-status` API endpoint to return whether
+ * repeat is currently enabled for the given channel.
+ *
+ * @route GET /repeat-status
+ * @query  {string} channelId - The ID of the Discord channel.
+ * @returns {{ repeatEnabled: boolean }}
+ */
+app.get('/repeat-status', (req, res) => {
+  const { channelId } = req.query;
+  res.json({ repeatEnabled: isRepeatEnabled(channelId) });
+});
+
 /*******************************************************
  *                   Audio APIs
  *******************************************************/
@@ -59,7 +72,7 @@ app.get('/env-config', (req, res) => {
 /**
  * Handles the `/audio-files` API endpoint to return a list of audio files
  * from the `audio-files` directory.
- * 
+ *
  * @route GET /audio-files
  * @returns {string[]} A list of audio file names.
  */
@@ -71,7 +84,7 @@ app.get('/audio-files', (req, res) => {
 /**
  * Handles the `/play-audio` API endpoint to play the specified audio file
  * in the Discord channel.
- * 
+ *
  * @route POST /play-audio
  * @param {string} fileName - The name of the audio file to play.
  * @param {string} channelId - The ID of the Discord channel.
@@ -85,7 +98,7 @@ app.post('/play-audio', (req, res) => {
 /**
  * Handles the `/stop-audio` API endpoint to stop the currently playing
  * audio in the Discord channel.
- * 
+ *
  * @route POST /stop-audio
  * @param {string} channelId - The ID of the Discord channel.
  */
@@ -98,7 +111,7 @@ app.post('/stop-audio', (req, res) => {
 /**
  * Handles the `/toggle-repeat` API endpoint to toggle the repeat
  * functionality for the audio playback in the Discord bot.
- * 
+ *
  * @route POST /toggle-repeat
  * @param {string} channelId - The ID of the Discord channel.
  * @returns {boolean} The new repeat state (enabled or disabled).
@@ -112,7 +125,7 @@ app.post('/toggle-repeat', (req, res) => {
 /**
  * Handles the `/set-audio` API endpoint to change the volume
  * for the audio playback in the Discord bot.
- * 
+ *
  * @route POST /set-audio
  * @param {string} channelId - The ID of the Discord channel.
  * @param {double} volume - The volume as decimal.
@@ -121,6 +134,38 @@ app.post('/set-volume', (req, res) => {
   const { channelId, volume } = req.body;
   setCurrentVolume(channelId, volume);
   res.sendStatus(200);
+});
+
+/**
+ * Handles the `/now-playing` API endpoint to return the name
+ * of the currently playing audio file (without extension).
+ *
+ * @route GET /now-playing
+ * @query  {string} channelId - The ID of the Discord channel.
+ * @returns {{ song: string|null }} The current song name, or null.
+ */
+app.get('/now-playing', (req, res) => {
+  const { channelId } = req.query;
+  const channel = discordClient.channels.cache.get(channelId);
+  if (channel) {
+    const fileName = currentAudioFile.get(channel.guild.id) || null;
+    res.json({ song: fileName ? fileName.replace(/\.[^/.]+$/, '') : null });
+  } else {
+    res.json({ song: null });
+  }
+});
+
+/**
+ * Handles the `/repeat-status` API endpoint to return whether
+ * repeat is currently enabled for the given channel.
+ *
+ * @route GET /repeat-status
+ * @query  {string} channelId - The ID of the Discord channel.
+ * @returns {{ repeatEnabled: boolean }}
+ */
+app.get('/repeat-status', (req, res) => {
+  const { channelId } = req.query;
+  res.json({ repeatEnabled: isRepeatEnabled(channelId) });
 });
 
 /*******************************************************
@@ -220,7 +265,6 @@ async function playAudioInDiscord(fileName, channelId) {
  * @returns {boolean} The new repeat state (true if enabled, false if disabled).
  */
 function discordToggleRepeat(channelId) {
-  console.log("Toggling repeat for channelId:", channelId);
   const channel = discordClient.channels.cache.get(channelId);
   if (channel) {
     const guildId = channel.guild.id;
@@ -240,7 +284,6 @@ function discordToggleRepeat(channelId) {
  * @param {double} volume - The volume as decimal.
  */
 function setCurrentVolume(channelId, volume) {
-  console.log("Changing volume for channelId:", channelId);
   const channel = discordClient.channels.cache.get(channelId);
   if (channel) {
     const guildId = channel.guild.id;

@@ -73,7 +73,6 @@ None
 ## Roadmap
 
 Coming soon:
-- Song name shown
 - Extended audio format support
 - More customization options
 - Improve frontend (...maybe :D)

@@ -196,3 +196,48 @@ main {
     }
 }
 
+
+/* -------------------------------------------------------
+   Now-Playing bar
+   ------------------------------------------------------- */
+.now-playing-bar {
+    width: 100%;
+    padding: 10px 24px;
+    background-color: #4A0E4E;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    /* sits right below the fixed navbar */
+    margin-top: 0;
+}
+
+.now-playing-label {
+    color: #FFD700;
+    font-weight: bold;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.now-playing-song {
+    color: #c9c9c9;         /* muted when idle */
+    font-size: 1rem;
+    font-style: italic;
+    transition: color 0.3s;
+}
+
+/* brighten the song name when something is actually playing */
+.now-playing-bar.has-song .now-playing-song {
+    color: #fff;
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* -------------------------------------------------------
+   Active (currently playing) audio button
+   ------------------------------------------------------- */
+#audioButtons .btn.active-song {
+    background-color: #FFD700 !important;
+    border-color:     #FFD700 !important;
+    color:            #4A0E4E !important;
+    box-shadow:       0 0 10px rgba(255, 215, 0, 0.6);
+}

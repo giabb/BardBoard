@@ -37,6 +37,7 @@
             .then(config => {
                 window.ENV = config;
             });
+
     </script>
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -65,6 +66,11 @@
             </div>
         </nav>
     </header>
+    <!-- Now Playing bar -->
+    <div id="nowPlayingBar" class="now-playing-bar">
+        <span class="now-playing-label">&#9654; Now Playing:</span>
+        <span id="nowPlayingSong" class="now-playing-song">Nothing playing</span>
+    </div>
     <main class="flex-shrink-0">
         <div class="container" id="staticButtonContainer">
             <div id="audioButtons" class="row"></div>
@@ -101,7 +107,7 @@
         /**
          * Sends a request to the server to play the specified audio file
          * in the Discord channel.
-         * 
+         *
          * @param {string} fileName - The name of the audio file to play.
          */
         function playAudio(fileName) {
@@ -122,10 +128,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ channelId: window.ENV.channelId })
             });
+            updateNowPlaying();   // clear the display instantly
         });
 
         /**
-         * Toggles the repeat functionality for the audio playback. 
+         * Toggles the repeat functionality for the audio playback.
          * Updates the button's appearance and sends a request to the server
          * to toggle the repeat state for the Discord bot.
          */
@@ -173,7 +180,74 @@
             })
             .catch(error => console.error('Error:', error));
         });
-        
+
+
+        // -------------------------------------------------------
+        // Now-Playing polling & highlight
+        // -------------------------------------------------------
+
+        /**
+         * Fetches the currently playing song from the server and
+         * updates the #nowPlayingSong element.  Also highlights
+         * the matching audio button while it is playing.
+         */
+        function updateNowPlaying() {
+            if (!window.ENV || !window.ENV.channelId) return;
+
+            fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
+                .then(res => res.json())
+                .then(data => {
+                    const songEl  = document.getElementById('nowPlayingSong');
+                    const barEl   = document.getElementById('nowPlayingBar');
+
+                    // Remove active class from every audio button first
+                    document.querySelectorAll('#audioButtons .btn').forEach(btn => btn.classList.remove('active-song'));
+
+                    if (data.song) {
+                        songEl.textContent = data.song;
+                        barEl.classList.add('has-song');
+
+                        // Highlight the matching button
+                        document.querySelectorAll('#audioButtons .btn').forEach(btn => {
+                            if (btn.textContent.trim() === data.song) btn.classList.add('active-song');
+                        });
+                    } else {
+                        songEl.textContent = 'Nothing playing';
+                        barEl.classList.remove('has-song');
+                    }
+                })
+                .catch(err => console.error('now-playing poll error:', err));
+        }
+
+        // Poll every 2 seconds
+        setInterval(updateNowPlaying, 2000);
+        // Initial fetch (after ENV is loaded) — sync now-playing AND repeat state
+        setTimeout(() => {
+            updateNowPlaying();
+            syncRepeatState();
+        }, 800);
+
+        /**
+         * Fetches the server's repeat state and syncs the toggle button
+         * so it survives a page reload.
+         */
+        function syncRepeatState() {
+            if (!window.ENV || !window.ENV.channelId) return;
+
+            fetch('/repeat-status?channelId=' + encodeURIComponent(window.ENV.channelId))
+                .then(res => res.json())
+                .then(data => {
+                    isRepeatEnabled = !!data.repeatEnabled;
+                    const button = document.getElementById('repeatToggle');
+                    if (isRepeatEnabled) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                })
+                .catch(err => console.error('repeat-status fetch error:', err));
+        }
+
     </script>
 </body>
 </html>
