@@ -21,233 +21,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>&#127925; BardBoard &amp; Dragons &#128009;</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Custom CSS -->
+    <title>🎵 BardBoard & Dragons 🐉</title>
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script>
-        /**
-         * Fetches environment configuration from the server when the page loads
-         * and sets the configuration to the global `window.ENV` object.
-         */
         fetch('/env-config')
             .then(response => response.json())
-            .then(config => {
-                window.ENV = config;
-            });
-
+            .then(config => { window.ENV = config; });
     </script>
 </head>
-<body class="d-flex flex-column min-vh-100">
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
-            <div class="container d-flex justify-content-between align-items-center">
-                <a class="navbar-brand" href="#">&#127925; BardBoard &amp; Dragons &#128009;</a>
-                <div class="header-buttons d-flex align-items-center">
-                    <label for="volumeSlider"></label><input id="volumeSlider" type="range" min="0" max="100" step="1" value="50" class="me-3">
-                    <button id="repeatToggle" class="toggle-button me-3" onclick="handleRepeatToggle()">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 1l4 4-4 4"></path>
-                            <path d="M3 11V9a4 4 0 014-4h14"></path>
-                            <path d="M7 23l-4-4 4-4"></path>
-                            <path d="M21 13v2a4 4 0 01-4 4H3"></path>
-                        </svg>
-                        Repeat
-                    </button>
-                    <button id="stopButton" class="toggle-button btn-danger">
-                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" stroke-width="2">
-                            <rect x="4" y="5" width="16" height="16"></rect>
-                        </svg>
-                        Stop
-                    </button>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <!-- Now Playing bar -->
-    <div id="nowPlayingBar" class="now-playing-bar">
-        <span class="now-playing-label">&#9654; Now Playing:</span>
-        <span id="nowPlayingSong" class="now-playing-song">Nothing playing</span>
+<body>
+
+    <!-- Ambient background particles -->
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
     </div>
-    <main class="flex-shrink-0">
-        <div class="container" id="staticButtonContainer">
-            <div id="audioButtons" class="row"></div>
+
+    <!-- ── Header ── -->
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <span class="brand-icon">🎵</span>
+                <h1 class="brand-title">BardBoard <span class="ampersand">&amp;</span> Dragons</h1>
+                <span class="brand-icon dragon">🐉</span>
+            </div>
+
+            <nav class="controls" aria-label="Playback controls">
+                <div class="volume-group">
+                    <svg class="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    <input id="volumeSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Volume">
+                </div>
+
+                <button id="repeatToggle" class="ctrl-btn ctrl-repeat" onclick="handleRepeatToggle()" aria-label="Toggle repeat">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 014-4h14"></path>
+                        <path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 01-4 4H3"></path>
+                    </svg>
+                    <span>Repeat</span>
+                </button>
+
+                <button id="stopButton" class="ctrl-btn ctrl-stop" aria-label="Stop">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
+                    <span>Stop</span>
+                </button>
+            </nav>
         </div>
+
+        <!-- Now-playing strip -->
+        <div id="nowPlayingBar" class="now-playing-strip">
+            <span class="np-pulse" aria-hidden="true"></span>
+            <span class="np-label">Now Playing</span>
+            <span class="np-divider">›</span>
+            <span id="nowPlayingSong" class="np-song">Nothing playing</span>
+        </div>
+    </header>
+
+    <!-- ── Main soundboard ── -->
+    <main class="soundboard">
+        <div id="audioButtons" class="track-grid"></div>
     </main>
-    <footer class="footer mt-auto py-3">
-        <div class="container text-center">
-            <span>Check my <a href="https://github.com/giabb">GitHub profile</a></span>
-        </div>
+
+    <!-- ── Footer ── -->
+    <footer class="app-footer">
+        <span>Made with ♥ by <a href="https://github.com/giabb" target="_blank" rel="noopener">giabb</a></span>
     </footer>
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        /**
-         * Fetches the list of audio files from the server and dynamically
-         * generates buttons to play each file in the Discord channel.
-         */
-        fetch('/audio-files')
-            .then(response => response.json())
-            .then(files => {
-                const buttonContainer = document.getElementById('audioButtons');
-                files.forEach(file => {
-                    const col = document.createElement('div');
-                    col.className = 'col-lg-3 col-md-4 col-sm-6';
-                    const button = document.createElement('button');
-                    button.className = 'btn w-100';
-                    button.textContent = file.replace(/\.[^/.]+$/, "");
-                    button.onclick = () => playAudio(file);
-                    col.appendChild(button);
-                    buttonContainer.appendChild(col);
+
+<!-- ──────────────── Scripts ──────────────── -->
+<script>
+// -------------------------------------------------------
+// Button generation
+// -------------------------------------------------------
+fetch('/audio-files')
+    .then(r => r.json())
+    .then(files => {
+        const grid = document.getElementById('audioButtons');
+        files.forEach((file, i) => {
+            const name = file.replace(/\.[^/.]+$/, '');
+
+            const btn = document.createElement('button');
+            btn.className = 'track-btn';
+            btn.style.animationDelay = `${i * 0.04}s`;
+            btn.setAttribute('data-track', name);
+            btn.setAttribute('aria-label', `Play ${name}`);
+
+            btn.innerHTML = `
+                <span class="track-label">${name}</span>
+            `;
+
+            btn.addEventListener('click', () => {
+                playAudio(file);
+                btn.classList.add('pressed');
+                setTimeout(() => btn.classList.remove('pressed'), 200);
+            });
+
+            grid.appendChild(btn);
+        });
+    });
+
+// -------------------------------------------------------
+// API helpers
+// -------------------------------------------------------
+function playAudio(fileName) {
+    fetch('/play-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, channelId: window.ENV.channelId })
+    });
+}
+
+document.getElementById('stopButton').addEventListener('click', () => {
+    fetch('/stop-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
+    });
+    updateNowPlaying();
+});
+
+let isRepeatEnabled = false;
+function handleRepeatToggle() {
+    isRepeatEnabled = !isRepeatEnabled;
+    document.getElementById('repeatToggle').classList.toggle('active', isRepeatEnabled);
+
+    fetch('/toggle-repeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
+    }).catch(err => console.error('toggle-repeat error:', err));
+}
+
+document.getElementById('volumeSlider').addEventListener('input', function () {
+    fetch('/set-volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId, volume: this.value / 100 })
+    }).catch(err => console.error('set-volume error:', err));
+});
+
+// -------------------------------------------------------
+// Now-Playing polling & button highlight
+// -------------------------------------------------------
+function updateNowPlaying() {
+    if (!window.ENV || !window.ENV.channelId) return;
+
+    fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
+        .then(r => r.json())
+        .then(data => {
+            const songEl = document.getElementById('nowPlayingSong');
+            const barEl  = document.getElementById('nowPlayingBar');
+
+            document.querySelectorAll('.track-btn').forEach(b => b.classList.remove('playing'));
+
+            if (data.song) {
+                songEl.textContent = data.song;
+                barEl.classList.add('has-song');
+                document.querySelectorAll('.track-btn').forEach(b => {
+                    if (b.dataset.track === data.song) b.classList.add('playing');
                 });
-            });
-
-        /**
-         * Sends a request to the server to play the specified audio file
-         * in the Discord channel.
-         *
-         * @param {string} fileName - The name of the audio file to play.
-         */
-        function playAudio(fileName) {
-            fetch('/play-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName, channelId: window.ENV.channelId })
-            });
-        }
-
-        /**
-         * Sends a request to the server to stop any currently playing audio
-         * in the Discord channel.
-         */
-        document.getElementById('stopButton').addEventListener('click', function() {
-            fetch('/stop-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ channelId: window.ENV.channelId })
-            });
-            updateNowPlaying();   // clear the display instantly
-        });
-
-        /**
-         * Toggles the repeat functionality for the audio playback.
-         * Updates the button's appearance and sends a request to the server
-         * to toggle the repeat state for the Discord bot.
-         */
-        let isRepeatEnabled = false;
-        function handleRepeatToggle() {
-            const button = document.getElementById('repeatToggle');
-            document.getElementById('status');
-            isRepeatEnabled = !isRepeatEnabled;
-
-            // Update UI based on toggle state
-            if (isRepeatEnabled) {
-                button.classList.add('active');
             } else {
-                button.classList.remove('active');
+                songEl.textContent = 'Nothing playing';
+                barEl.classList.remove('has-song');
             }
+        })
+        .catch(err => console.error('now-playing poll error:', err));
+}
 
-            // Send toggle request to server
-            fetch('/toggle-repeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ channelId: window.ENV.channelId })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to toggle repeat on server');
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        }
+function syncRepeatState() {
+    if (!window.ENV || !window.ENV.channelId) return;
+    fetch('/repeat-status?channelId=' + encodeURIComponent(window.ENV.channelId))
+        .then(r => r.json())
+        .then(data => {
+            isRepeatEnabled = !!data.repeatEnabled;
+            document.getElementById('repeatToggle').classList.toggle('active', isRepeatEnabled);
+        })
+        .catch(err => console.error('repeat-status error:', err));
+}
 
-        document.getElementById('volumeSlider').addEventListener('input', function () {
-            const volume = this.value / 100;
-            const channelId = window.ENV.channelId;
-
-            // Send the volume data to /set-volume
-            fetch('/set-volume', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ channelId, volume })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to set volume on server');
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        });
-
-
-        // -------------------------------------------------------
-        // Now-Playing polling & highlight
-        // -------------------------------------------------------
-
-        /**
-         * Fetches the currently playing song from the server and
-         * updates the #nowPlayingSong element.  Also highlights
-         * the matching audio button while it is playing.
-         */
-        function updateNowPlaying() {
-            if (!window.ENV || !window.ENV.channelId) return;
-
-            fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
-                .then(res => res.json())
-                .then(data => {
-                    const songEl  = document.getElementById('nowPlayingSong');
-                    const barEl   = document.getElementById('nowPlayingBar');
-
-                    // Remove active class from every audio button first
-                    document.querySelectorAll('#audioButtons .btn').forEach(btn => btn.classList.remove('active-song'));
-
-                    if (data.song) {
-                        songEl.textContent = data.song;
-                        barEl.classList.add('has-song');
-
-                        // Highlight the matching button
-                        document.querySelectorAll('#audioButtons .btn').forEach(btn => {
-                            if (btn.textContent.trim() === data.song) btn.classList.add('active-song');
-                        });
-                    } else {
-                        songEl.textContent = 'Nothing playing';
-                        barEl.classList.remove('has-song');
-                    }
-                })
-                .catch(err => console.error('now-playing poll error:', err));
-        }
-
-        // Poll every 2 seconds
-        setInterval(updateNowPlaying, 2000);
-        // Initial fetch (after ENV is loaded) — sync now-playing AND repeat state
-        setTimeout(() => {
-            updateNowPlaying();
-            syncRepeatState();
-        }, 800);
-
-        /**
-         * Fetches the server's repeat state and syncs the toggle button
-         * so it survives a page reload.
-         */
-        function syncRepeatState() {
-            if (!window.ENV || !window.ENV.channelId) return;
-
-            fetch('/repeat-status?channelId=' + encodeURIComponent(window.ENV.channelId))
-                .then(res => res.json())
-                .then(data => {
-                    isRepeatEnabled = !!data.repeatEnabled;
-                    const button = document.getElementById('repeatToggle');
-                    if (isRepeatEnabled) {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
-                })
-                .catch(err => console.error('repeat-status fetch error:', err));
-        }
-
-    </script>
+setInterval(updateNowPlaying, 2000);
+setTimeout(() => { updateNowPlaying(); syncRepeatState(); }, 800);
+</script>
 </body>
 </html>

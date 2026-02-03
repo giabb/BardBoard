@@ -75,7 +75,6 @@ None
 Coming soon:
 - Extended audio format support
 - More customization options
-- Improve frontend (...maybe :D)
 - Any idea you can have: just PM me or open a PR.
 
 ## Contributors
