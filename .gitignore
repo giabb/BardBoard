@@ -3,7 +3,10 @@
 .bkp/
 .idea/
 *.mp3
-!audio-files/bonus.mp3
+*.wav
+*.ogg
+*.m4a
+!audio-files/audio-subfolder/bonus.mp3
 !audio-files/test1.mp3
 !audio-files/test2.mp3
 !audio-files/test3.mp3
