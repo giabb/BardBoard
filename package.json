@@ -26,5 +26,9 @@
     "dotenv": "^17.2.3",
     "music-metadata": "^11.11.2",
     "@snazzah/davey": "^0.1.9"
+  },
+  "overrides": {
+    "tar": "^7.5.7",
+    "undici": "^7.20.0"
   }
 }
