@@ -19,8 +19,9 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { Events, Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
 const sodium = require('libsodium-wrappers');
 const musicmetadata = require('music-metadata');
 const app = express();
@@ -161,15 +162,33 @@ app.post('/seek', async (req, res) => {
 
   try {
     const volume   = currentVolume.get(guildId) || 0.5;
-    const resource = createAudioResource(`./audio-files/${fileName}`, {
-      inlineVolume: true,
-      metadata: { title: fileName },
-      start: offsetSecs          // ← discordjs/voice native seek
+    const filePath = path.resolve(`./audio-files/${fileName}`);
+
+    // Spawn ffmpeg to seek
+    const ffmpeg = spawn('ffmpeg', [
+      '-ss', String(offsetSecs),
+      '-i', filePath,
+      '-f', 's16le',
+      '-ar', '48000',
+      '-ac', '2',
+      'pipe:1'
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    // Handle FFmpeg errors to prevent silent crashes
+    ffmpeg.on('error', (err) => {
+        console.error('FFmpeg spawn error:', err);
     });
+
+    const resource = createAudioResource(ffmpeg.stdout, {
+      inputType: StreamType.Raw,
+      inlineVolume: true,
+      metadata: { title: fileName }
+    });
+
     resource.volume.setVolume(volume);
 
     activeAudioResources.set(guildId, resource);
-    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);  // keep elapsed in sync
+    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
     player.play(resource);
 
     res.sendStatus(200);
