@@ -81,8 +81,48 @@ app.get('/repeat-status', (req, res) => {
  * @returns {string[]} A list of audio file names.
  */
 app.get('/audio-files', (req, res) => {
-  const audioFiles = fs.readdirSync('./audio-files');
-  res.json(audioFiles);
+  const baseDir = './audio-files';
+
+  // Helper to get all items safely
+  let entries = [];
+  try {
+      entries = fs.readdirSync(baseDir, { withFileTypes: true });
+  } catch (e) {
+      console.error("Could not read audio-files directory:", e);
+      return res.json({ root: [], categories: {} });
+  }
+
+  const response = {
+    root: [],
+    categories: {}
+  };
+
+  // Supported extensions
+  const isAudio = (name) => /\.(mp3|wav|ogg|m4a)$/i.test(name);
+
+  entries.forEach(entry => {
+    if (entry.isFile() && isAudio(entry.name)) {
+      // Files in the main folder
+      response.root.push(entry.name);
+
+    } else if (entry.isDirectory()) {
+      // Files inside subfolders (categories)
+      const subDirPath = path.join(baseDir, entry.name);
+      try {
+        const subFiles = fs.readdirSync(subDirPath)
+          .filter(f => isAudio(f))
+          .map(f => `${entry.name}/${f}`); // Create relative path "Folder/File.mp3"
+
+        if (subFiles.length > 0) {
+          response.categories[entry.name] = subFiles;
+        }
+      } catch (err) {
+        console.error(`Error reading subdir ${entry.name}:`, err);
+      }
+    }
+  });
+
+  res.json(response);
 });
 
 /**

@@ -81,7 +81,7 @@
             <span class="np-divider">›</span>
             <span id="nowPlayingSong" class="np-song">Nothing playing</span>
 
-            <!-- progress row (hidden until a song is playing) -->
+            <!-- progress bar (hidden until a song is playing) -->
             <div class="np-progress-row" id="npProgressRow">
                 <span class="np-time" id="npElapsed">0:00</span>
                 <div class="np-bar-track" id="npBarTrack">
@@ -95,7 +95,7 @@
 
     <!-- ── Main soundboard ── -->
     <main class="soundboard">
-        <div id="audioButtons" class="track-grid"></div>
+        <div id="audioButtons"></div>
     </main>
 
     <!-- ── Footer ── -->
@@ -110,29 +110,66 @@
 // -------------------------------------------------------
 fetch('/audio-files')
     .then(r => r.json())
-    .then(files => {
-        const grid = document.getElementById('audioButtons');
-        files.forEach((file, i) => {
-            const name = file.replace(/\.[^/.]+$/, '');
+    .then(data => {
+        const container = document.getElementById('audioButtons');
+        container.innerHTML = ''; // Clear loading state if any
 
-            const btn = document.createElement('button');
-            btn.className = 'track-btn';
-            btn.style.animationDelay = `${i * 0.04}s`;
-            btn.setAttribute('data-track', name);
-            btn.setAttribute('aria-label', `Play ${name}`);
+        // Helper to create a grid of buttons
+        const createGrid = (files, animationOffset = 0) => {
+            const grid = document.createElement('div');
+            grid.className = 'track-grid';
 
-            btn.innerHTML = `
-                <span class="track-label">${name}</span>
-            `;
+            files.forEach((file, i) => {
+                // Display name: removes folder path and extension
+                // e.g. "Dungeon/Scary.mp3" -> "Scary"
+                const displayName = file.split('/').pop().replace(/\.[^/.]+$/, '');
 
-            btn.addEventListener('click', () => {
-                playAudio(file);
-                btn.classList.add('pressed');
-                setTimeout(() => btn.classList.remove('pressed'), 200);
+                const btn = document.createElement('button');
+                btn.className = 'track-btn';
+                // Stagger animation slightly based on index
+                btn.style.animationDelay = `${(i + animationOffset) * 0.03}s`;
+                btn.setAttribute('data-track', file.replace(/\.[^/.]+$/, '')); // used for now-playing matching
+                btn.setAttribute('aria-label', `Play ${displayName}`);
+
+                btn.innerHTML = `
+                    <span class="track-label">${displayName}</span>
+                `;
+
+                btn.addEventListener('click', () => {
+                    playAudio(file); // Passes "Folder/File.mp3" to server
+                    btn.classList.add('pressed');
+                    setTimeout(() => btn.classList.remove('pressed'), 200);
+                });
+
+                grid.appendChild(btn);
             });
+            return grid;
+        };
 
-            grid.appendChild(btn);
-        });
+        let globalCount = 0;
+
+        // Render Root Files (Uncategorized)
+        if (data.root && data.root.length > 0) {
+            container.appendChild(createGrid(data.root, globalCount));
+            globalCount += data.root.length;
+        }
+
+        // Render Categories
+        if (data.categories) {
+            Object.keys(data.categories).forEach(folderName => {
+                const files = data.categories[folderName];
+
+                // Create Separator
+                const header = document.createElement('h2');
+                header.className = 'category-header';
+                header.innerHTML = `<span>${folderName}</span>`;
+                container.appendChild(header);
+
+                // Create Grid for this folder
+                container.appendChild(createGrid(files, globalCount));
+                globalCount += files.length;
+            });
+        }
     });
 
 // -------------------------------------------------------
@@ -328,7 +365,7 @@ function syncRepeatState() {
         .catch(err => console.error('repeat-status error:', err));
 }
 
-setInterval(updateNowPlaying, 2000);
+setInterval(updateNowPlaying, 1000);
 setTimeout(() => { updateNowPlaying(); syncRepeatState(); }, 800);
 </script>
 </body>
