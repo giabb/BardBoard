@@ -228,6 +228,22 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     box-shadow: 0 0 14px rgba(220,50,50,0.3);
 }
 
+/* Pause Button specific styling */
+.ctrl-pause.paused {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(139, 92, 246, 0.15));
+    border-color: var(--accent-violet);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
+    color: #c4b5fd;
+}
+
+.ctrl-pause svg {
+    transition: transform var(--transition);
+}
+
+.ctrl-pause:hover svg {
+    transform: scale(1.1);
+}
+
 /* =============================================
    NOW-PLAYING STRIP
    ============================================= */

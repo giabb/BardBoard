@@ -59,6 +59,13 @@
                     <input id="volumeSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Volume">
                 </div>
 
+                <button id="pauseToggle" class="ctrl-btn ctrl-pause" onclick="handlePauseToggle()" aria-label="Pause/Resume">
+                    <svg id="pauseIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                    <span>Pause</span>
+                </button>
+
                 <button id="repeatToggle" class="ctrl-btn ctrl-repeat" onclick="handleRepeatToggle()" aria-label="Toggle repeat">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 014-4h14"></path>
@@ -196,6 +203,41 @@ fetch('/audio-files')
         }
     });
 
+let isPaused = false;
+
+function handlePauseToggle() {
+    fetch('/toggle-pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
+    })
+    .then(r => r.json())
+    .then(data => {
+        updatePauseUI(data.paused);
+    });
+}
+
+function updatePauseUI(paused) {
+    isPaused = paused;
+    const btn = document.getElementById('pauseToggle');
+    const icon = document.getElementById('pauseIcon');
+    const label = btn.querySelector('span');
+
+    if (isPaused) {
+        btn.classList.add('paused');
+        label.textContent = 'Resume';
+        // Switch to Play Icon
+        icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+    } else {
+        btn.classList.remove('paused');
+        label.textContent = 'Pause';
+        // Switch back to Pause Icon
+        icon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+        // Reset poll time when resuming so interpolation continues correctly
+        npPollTime = performance.now();
+    }
+}
+
 // -------------------------------------------------------
 // API helpers
 // -------------------------------------------------------
@@ -241,7 +283,7 @@ document.getElementById('volumeSlider').addEventListener('input', function () {
 // -------------------------------------------------------
 
 /** latest server payload — kept in module scope so the local ticker can read it */
-let npState = { song: null, elapsed: 0, duration: 0 };
+let npState = { song: null, elapsed: 0, duration: 0, paused: false };
 /** timestamp (performance.now) of the last successful poll */
 let npPollTime = 0;
 
@@ -288,6 +330,7 @@ function updateNowPlaying() {
 
             npState   = data;
             npPollTime = performance.now();
+            isPaused  = data.paused || false;
 
             if (data.song) {
                 songEl.textContent = data.song;
@@ -311,10 +354,11 @@ function updateNowPlaying() {
 
 /**
  * Runs every 250 ms: interpolates elapsed forward from the last polled
- * snapshot so the bar moves smoothly between 2-second server polls.
+ * snapshot so the bar moves smoothly between 1-second server polls.
+ * Only updates when not paused.
  */
 setInterval(() => {
-    if (!npState.song) return;
+    if (!npState.song || isPaused) return;
     const dt = (performance.now() - npPollTime) / 1000;
     renderProgress(dt);
 }, 250);

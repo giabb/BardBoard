@@ -40,6 +40,8 @@ const currentVolume = new Map();
 const activeAudioResources = new Map();
 const playStartTime   = new Map();   // guildId → Date.now() when current track started
 const trackDurations  = new Map();   // fileName → duration in seconds (cached)
+const pausedState     = new Map();   // guildId → boolean (is currently paused)
+const pausedElapsed   = new Map();   // guildId → elapsed seconds when paused
 
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from 'public' directory
@@ -140,6 +142,43 @@ app.post('/play-audio', (req, res) => {
 });
 
 /**
+ * Handles the `/toggle-pause` API endpoint.
+ * @route POST /toggle-pause
+ */
+app.post('/toggle-pause', (req, res) => {
+  const { channelId } = req.body;
+  const channel = discordClient.channels.cache.get(channelId);
+  if (!channel) return res.sendStatus(404);
+
+  const guildId = channel.guild.id;
+  const player = activeAudioPlayers.get(guildId);
+  if (!player) return res.sendStatus(404);
+
+  let paused = false;
+  if (player.state.status === 'playing') {
+    // Pausing: store current elapsed time
+    const startedAt = playStartTime.get(guildId) || Date.now();
+    const elapsed = (Date.now() - startedAt) / 1000;
+    pausedElapsed.set(guildId, elapsed);
+
+    player.pause();
+    paused = true;
+    pausedState.set(guildId, true);
+  } else if (player.state.status === 'paused') {
+    // Resuming: adjust start time to account for paused duration
+    const elapsed = pausedElapsed.get(guildId) || 0;
+    playStartTime.set(guildId, Date.now() - (elapsed * 1000));
+    pausedElapsed.delete(guildId);
+
+    player.unpause();
+    paused = false;
+    pausedState.set(guildId, false);
+  }
+
+  res.json({ paused });
+});
+
+/**
  * Handles the `/stop-audio` API endpoint to stop the currently playing
  * audio in the Discord channel.
  *
@@ -229,6 +268,13 @@ app.post('/seek', async (req, res) => {
 
     activeAudioResources.set(guildId, resource);
     playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
+
+    // If we're paused, update the pausedElapsed instead
+    const isPaused = pausedState.get(guildId) || false;
+    if (isPaused) {
+      pausedElapsed.set(guildId, offsetSecs);
+    }
+
     player.play(resource);
 
     res.sendStatus(200);
@@ -267,14 +313,24 @@ app.get('/now-playing', async (req, res) => {
     trackDurations.set(fileName, duration);
   }
 
-  // --- elapsed: wall-clock since playback started ---
-  const startedAt = playStartTime.get(guildId) || Date.now();
-  const elapsed   = Math.min((Date.now() - startedAt) / 1000, duration);
+  // --- elapsed: wall-clock since playback started, or frozen if paused ---
+  let elapsed;
+  const isPaused = pausedState.get(guildId) || false;
+
+  if (isPaused) {
+    // Return frozen elapsed time when paused
+    elapsed = pausedElapsed.get(guildId) || 0;
+  } else {
+    // Calculate current elapsed time when playing
+    const startedAt = playStartTime.get(guildId) || Date.now();
+    elapsed = Math.min((Date.now() - startedAt) / 1000, duration);
+  }
 
   res.json({
     song:     fileName.replace(/\.[^/.]+$/, ''),
     elapsed:  Math.round(elapsed * 10) / 10,   // 1 decimal
-    duration: Math.round(duration * 10) / 10
+    duration: Math.round(duration * 10) / 10,
+    paused:   isPaused
   });
 });
 
@@ -297,7 +353,7 @@ app.get('/repeat-status', (req, res) => {
 
 /**
  * Plays the specified audio file in the Discord channel.
- * 
+ *
  * @async
  * @param {string} fileName - The name of the audio file to play.
  * @param {string} channelId - The ID of the Discord channel.
@@ -346,7 +402,7 @@ async function playAudioInDiscord(fileName, channelId) {
     currentAudioFile.set(channel.guild.id, fileName);
 
     const resource = createAudioResource(`./audio-files/${fileName}`, { inlineVolume: true });
-    
+
     // Set the initial volume
     const volume = currentVolume.get(channel.guild.id) || 0.5;
     resource.volume.setVolume(volume);
@@ -356,6 +412,7 @@ async function playAudioInDiscord(fileName, channelId) {
     activeAudioResources.set(channel.guild.id, resource);
 
     playStartTime.set(channel.guild.id, Date.now());   // ← record when playback starts
+    pausedState.set(channel.guild.id, false);          // ← reset paused state
     player.play(resource);
 
     // Handle repeat when audio ends
@@ -385,7 +442,7 @@ async function playAudioInDiscord(fileName, channelId) {
 
 /**
  * Toggles the repeat functionality for the audio playback in the specified Discord channel.
- * 
+ *
  * @param {string} channelId - The ID of the Discord channel.
  * @returns {boolean} The new repeat state (true if enabled, false if disabled).
  */
@@ -404,7 +461,7 @@ function discordToggleRepeat(channelId) {
 
 /**
  * Changes the volume for the audio playback in the specified Discord channel.
- * 
+ *
  * @param {string} channelId - The ID of the Discord channel.
  * @param {double} volume - The volume as decimal.
  */
@@ -412,10 +469,10 @@ function setCurrentVolume(channelId, volume) {
   const channel = discordClient.channels.cache.get(channelId);
   if (channel) {
     const guildId = channel.guild.id;
-    
+
     currentVolume.set(guildId, volume);
     console.log("New volume for guild:", guildId, currentVolume);
-    
+
     const player = activeAudioPlayers.get(guildId);
     if (player) {
       const resource = player.state.resource;
@@ -430,7 +487,7 @@ function setCurrentVolume(channelId, volume) {
 
 /**
  * Stops the audio playback in the specified Discord channel and cleans up the audio player resources.
- * 
+ *
  * @param {string} channelId - The ID of the Discord channel.
  */
 function stopAudioInDiscord(channelId) {
@@ -442,7 +499,7 @@ function stopAudioInDiscord(channelId) {
 
 /**
  * Gets the current repeat status for the audio playback in the specified Discord channel.
- * 
+ *
  * @param {string} channelId - The ID of the Discord channel.
  * @returns {boolean} The current repeat status (true if enabled, false if disabled).
  */
@@ -456,7 +513,7 @@ function isRepeatEnabled(channelId) {
 
 /**
  * Disconnects from the voice channel and cleans up all resources for the specified Discord channel.
- * 
+ *
  * @param {string} channelId - The ID of the Discord channel.
  */
 function disconnectFromVoice(channelId) {
@@ -468,7 +525,7 @@ function disconnectFromVoice(channelId) {
 
 /**
  * Cleans up only the audio player resources for the specified guild.
- * 
+ *
  * @param {string} guildId - The ID of the Discord guild.
  */
 function cleanupPlayerOnly(guildId) {
@@ -479,6 +536,8 @@ function cleanupPlayerOnly(guildId) {
     activeAudioPlayers.delete(guildId);
     currentAudioFile.delete(guildId);
     playStartTime.delete(guildId);
+    pausedState.delete(guildId);
+    pausedElapsed.delete(guildId);
   }
 }
 
