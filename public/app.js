@@ -147,7 +147,7 @@ async function loadAudioButtons() {
 let isPaused = false;
 
 function handlePauseToggle() {
-    fetch('/toggle-pause', {
+    void fetch('/toggle-pause', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: window.ENV.channelId })
@@ -183,7 +183,7 @@ function updatePauseUI(paused) {
 // API helpers
 // -------------------------------------------------------
 function playAudio(fileName) {
-    fetch('/play-audio', {
+    void fetch('/play-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName, channelId: window.ENV.channelId })
@@ -191,7 +191,7 @@ function playAudio(fileName) {
 }
 
 document.getElementById('stopButton').addEventListener('click', () => {
-    fetch('/stop-audio', {
+    void fetch('/stop-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: window.ENV.channelId })
@@ -204,7 +204,7 @@ function handleRepeatToggle() {
     isRepeatEnabled = !isRepeatEnabled;
     document.getElementById('repeatToggle').classList.toggle('active', isRepeatEnabled);
 
-    fetch('/toggle-repeat', {
+    void fetch('/toggle-repeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: window.ENV.channelId })
@@ -212,7 +212,7 @@ function handleRepeatToggle() {
 }
 
 document.getElementById('volumeSlider').addEventListener('input', function () {
-    fetch('/set-volume', {
+    void fetch('/set-volume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelId: window.ENV.channelId, volume: this.value / 100 })
@@ -223,13 +223,13 @@ document.getElementById('volumeSlider').addEventListener('input', function () {
 // Now-Playing polling, progress bar, seek
 // -------------------------------------------------------
 
-/** latest server payload â€” kept in module scope so the local ticker can read it */
+/** latest server payload - kept in module scope so the local ticker can read it */
 let npState = { song: null, elapsed: 0, duration: 0, paused: false };
 /** timestamp (performance.now) of the last successful poll */
 let npPollTime = 0;
 
 /**
- * Formats seconds â†’ "M:SS"
+ * Formats seconds -> "M:SS""
  */
 function formatTime(sec) {
     sec = Math.max(0, Math.floor(sec));
@@ -272,6 +272,7 @@ function updateNowPlaying() {
             npState   = data;
             npPollTime = performance.now();
             isPaused  = data.paused || false;
+            updatePauseUI(isPaused);
 
             if (data.song) {
                 songEl.textContent = data.song;
@@ -322,7 +323,7 @@ setInterval(() => {
         renderProgress(0);
 
         // tell the server
-        fetch('/seek', {
+        void fetch('/seek', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ channelId: window.ENV.channelId, offsetSecs: target })
@@ -420,7 +421,7 @@ async function initApp() {
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', () => { void initApp(); });
 } else {
-    initApp();
+    void initApp();
 }
