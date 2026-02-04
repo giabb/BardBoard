@@ -444,8 +444,18 @@ function syncVolumeState() {
         .catch(err => console.error('get-volume error:', err));
 }
 
+function syncPauseState() {
+    if (!window.ENV || !window.ENV.channelId) return;
+    fetch('/pause-status?channelId=' + encodeURIComponent(window.ENV.channelId))
+        .then(r => r.json())
+        .then(data => {
+            updatePauseUI(data.paused);
+        })
+        .catch(err => console.error('pause-status error:', err));
+}
+
 setInterval(updateNowPlaying, 1000);
-setTimeout(() => { updateNowPlaying(); syncRepeatState(); syncVolumeState(); }, 800);
+setTimeout(() => { updateNowPlaying(); syncRepeatState(); syncVolumeState(); syncPauseState(); }, 800);
 </script>
 </body>
 </html>

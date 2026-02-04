@@ -179,6 +179,24 @@ app.post('/toggle-pause', (req, res) => {
 });
 
 /**
+ * Handles the `/pause-status` API endpoint to return whether
+ * playback is currently paused for the given channel.
+ *
+ * @route GET /pause-status
+ * @query  {string} channelId - The ID of the Discord channel.
+ * @returns {{ paused: boolean }}
+ */
+app.get('/pause-status', (req, res) => {
+  const { channelId } = req.query;
+  const channel = discordClient.channels.cache.get(channelId);
+  if (!channel) return res.json({ paused: false });
+
+  const guildId = channel.guild.id;
+  const paused = pausedState.get(guildId) || false;
+  res.json({ paused });
+});
+
+/**
  * Handles the `/stop-audio` API endpoint to stop the currently playing
  * audio in the Discord channel.
  *
