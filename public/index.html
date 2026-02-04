@@ -24,13 +24,15 @@
     <title>🎵 BardBoard & Dragons 🐉</title>
     <link rel="stylesheet" href="/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <script>
-        fetch('/env-config')
-            .then(response => response.json())
-            .then(config => { window.ENV = config; });
-    </script>
 </head>
 <body>
+
+    <div id="appLoader" class="app-loader">
+        <div class="loader-content">
+            <img class="loader-ouroboros" src="/ouroboros.svg" alt="Loading">
+            <p>Preparing the Tavern...</p>
+        </div>
+    </div>
 
     <!-- Ambient background particles -->
     <div class="ambient-bg" aria-hidden="true">
@@ -113,95 +115,117 @@
 <!-- ──────────────── Scripts ──────────────── -->
 <script>
 // -------------------------------------------------------
-// Button generation
+// Initial load helpers (env + audio list + state sync)
 // -------------------------------------------------------
-fetch('/audio-files')
-    .then(r => r.json())
-    .then(data => {
-        const container = document.getElementById('audioButtons');
-        container.innerHTML = ''; // Clear loading state if any
+function showLoader() {
+    const loaderEl = document.getElementById('appLoader');
+    if (!loaderEl) return;
+    document.body.classList.remove('ready');
+    loaderEl.classList.remove('loaded');
+}
 
-        // Helper to create a grid of buttons
-        const createGrid = (files, animationOffset = 0) => {
-            const grid = document.createElement('div');
-            grid.className = 'track-grid';
+function hideLoader() {
+    const loaderEl = document.getElementById('appLoader');
+    if (!loaderEl) return;
+    document.body.classList.add('ready');
+    loaderEl.classList.add('loaded');
+}
 
-            files.forEach((file, i) => {
-                // Display name: removes folder path and extension
-                // e.g. "Dungeon/Scary.mp3" -> "Scary"
-                const displayName = file.split('/').pop().replace(/\.[^/.]+$/, '');
+async function ensureEnvConfig() {
+    if (window.ENV && window.ENV.channelId) return window.ENV;
+    const response = await fetch('/env-config');
+    const config = await response.json();
+    window.ENV = config;
+    return config;
+}
 
-                const btn = document.createElement('button');
-                btn.className = 'track-btn';
-                // Stagger animation slightly based on index
-                btn.style.animationDelay = `${(i + animationOffset) * 0.03}s`;
-                btn.setAttribute('data-track', file.replace(/\.[^/.]+$/, '')); // used for now-playing matching
-                btn.setAttribute('aria-label', `Play ${displayName}`);
+async function loadAudioButtons() {
+    const response = await fetch('/audio-files');
+    const data = await response.json();
+    const container = document.getElementById('audioButtons');
+    container.innerHTML = ''; // Clear loading state if any
 
-                btn.innerHTML = `
-                    <span class="track-label">${displayName}</span>
-                `;
+    // Helper to create a grid of buttons
+    const createGrid = (files, animationOffset = 0) => {
+        const grid = document.createElement('div');
+        grid.className = 'track-grid';
 
-                btn.addEventListener('click', () => {
-                    playAudio(file); // Passes "Folder/File.mp3" to server
-                    btn.classList.add('pressed');
-                    setTimeout(() => btn.classList.remove('pressed'), 200);
-                });
+        files.forEach((file, i) => {
+            // Display name: removes folder path and extension
+            // e.g. "Dungeon/Scary.mp3" -> "Scary"
+            const displayName = file.split('/').pop().replace(/\.[^/.]+$/, '');
 
-                grid.appendChild(btn);
+            const btn = document.createElement('button');
+            btn.className = 'track-btn';
+            // Stagger animation slightly based on index
+            btn.style.animationDelay = `${(i + animationOffset) * 0.03}s`;
+            btn.setAttribute('data-track', file.replace(/\.[^/.]+$/, '')); // used for now-playing matching
+            btn.setAttribute('aria-label', `Play ${displayName}`);
+
+            btn.innerHTML = `
+                <span class="track-label">${displayName}</span>
+            `;
+
+            btn.addEventListener('click', () => {
+                playAudio(file); // Passes "Folder/File.mp3" to server
+                btn.classList.add('pressed');
+                setTimeout(() => btn.classList.remove('pressed'), 200);
             });
-            return grid;
-        };
 
-        let globalCount = 0;
+            grid.appendChild(btn);
+        });
+        return grid;
+    };
 
-        // Render Root Files (Uncategorized)
-        if (data.root && data.root.length > 0) {
-            container.appendChild(createGrid(data.root, globalCount));
-            globalCount += data.root.length;
-        }
+    let globalCount = 0;
 
-        // Render Categories
-        if (data.categories) {
-            Object.keys(data.categories).forEach(folderName => {
-                const files = data.categories[folderName];
+    // Render Root Files (Uncategorized)
+    if (data.root && data.root.length > 0) {
+        container.appendChild(createGrid(data.root, globalCount));
+        globalCount += data.root.length;
+    }
 
-                // Create the Header with a toggle
-                const header = document.createElement('h2');
-                header.className = 'category-header';
-                header.innerHTML = `
-                    <span>${folderName}</span>
-                    <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                `;
+    // Render Categories
+    if (data.categories) {
+        Object.keys(data.categories).forEach(folderName => {
+            const files = data.categories[folderName];
 
-                // Create a wrapper for the collapsible effect
-                const wrapper = document.createElement('div');
-                wrapper.className = 'category-wrapper'; // Default state: Open
+            // Create the Header with a toggle
+            const header = document.createElement('h2');
+            header.className = 'category-header';
+            header.innerHTML = `
+                <span>${folderName}</span>
+                <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            `;
 
-                const inner = document.createElement('div');
-                inner.className = 'category-inner';
+            // Create a wrapper for the collapsible effect
+            const wrapper = document.createElement('div');
+            wrapper.className = 'category-wrapper'; // Default state: Open
 
-                // Put the grid inside the inner wrapper
-                inner.appendChild(createGrid(files, globalCount));
-                wrapper.appendChild(inner);
+            const inner = document.createElement('div');
+            inner.className = 'category-inner';
 
-                // Add Click Event to Toggle
-                header.addEventListener('click', () => {
-                    // Toggle the 'collapsed' class on both header (for arrow rotation) and wrapper (for height)
-                    header.classList.toggle('collapsed');
-                    wrapper.classList.toggle('collapsed');
-                });
+            // Put the grid inside the inner wrapper
+            inner.appendChild(createGrid(files, globalCount));
+            wrapper.appendChild(inner);
 
-                // Append everything to the main container
-                container.appendChild(header);
-                container.appendChild(wrapper);
-
-                globalCount += files.length;
+            // Add Click Event to Toggle
+            header.addEventListener('click', () => {
+                // Toggle the 'collapsed' class on both header (for arrow rotation) and wrapper (for height)
+                header.classList.toggle('collapsed');
+                wrapper.classList.toggle('collapsed');
             });
-        }
-    });
+
+            // Append everything to the main container
+            container.appendChild(header);
+            container.appendChild(wrapper);
+
+            globalCount += files.length;
+        });
+    }
+}
 
 let isPaused = false;
 
@@ -317,9 +341,9 @@ function renderProgress(dt) {
  * shows/hides the progress row, and anchors the local interpolation ticker.
  */
 function updateNowPlaying() {
-    if (!window.ENV || !window.ENV.channelId) return;
+    if (!window.ENV || !window.ENV.channelId) return Promise.resolve();
 
-    fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
+    return fetch('/now-playing?channelId=' + encodeURIComponent(window.ENV.channelId))
         .then(r => r.json())
         .then(data => {
             const songEl    = document.getElementById('nowPlayingSong');
@@ -423,8 +447,8 @@ setInterval(() => {
 })();
 
 function syncRepeatState() {
-    if (!window.ENV || !window.ENV.channelId) return;
-    fetch('/repeat-status?channelId=' + encodeURIComponent(window.ENV.channelId))
+    if (!window.ENV || !window.ENV.channelId) return Promise.resolve();
+    return fetch('/repeat-status?channelId=' + encodeURIComponent(window.ENV.channelId))
         .then(r => r.json())
         .then(data => {
             isRepeatEnabled = !!data.repeatEnabled;
@@ -434,8 +458,8 @@ function syncRepeatState() {
 }
 
 function syncVolumeState() {
-    if (!window.ENV || !window.ENV.channelId) return;
-    fetch('/get-volume?channelId=' + encodeURIComponent(window.ENV.channelId))
+    if (!window.ENV || !window.ENV.channelId) return Promise.resolve();
+    return fetch('/get-volume?channelId=' + encodeURIComponent(window.ENV.channelId))
         .then(r => r.json())
         .then(data => {
             const volumeSlider = document.getElementById('volumeSlider');
@@ -445,8 +469,8 @@ function syncVolumeState() {
 }
 
 function syncPauseState() {
-    if (!window.ENV || !window.ENV.channelId) return;
-    fetch('/pause-status?channelId=' + encodeURIComponent(window.ENV.channelId))
+    if (!window.ENV || !window.ENV.channelId) return Promise.resolve();
+    return fetch('/pause-status?channelId=' + encodeURIComponent(window.ENV.channelId))
         .then(r => r.json())
         .then(data => {
             updatePauseUI(data.paused);
@@ -454,8 +478,30 @@ function syncPauseState() {
         .catch(err => console.error('pause-status error:', err));
 }
 
-setInterval(updateNowPlaying, 1000);
-setTimeout(() => { updateNowPlaying(); syncRepeatState(); syncVolumeState(); syncPauseState(); }, 800);
+async function initApp() {
+    showLoader();
+    try {
+        await ensureEnvConfig();
+        await loadAudioButtons();
+        await Promise.all([
+            updateNowPlaying(),
+            syncRepeatState(),
+            syncVolumeState(),
+            syncPauseState()
+        ]);
+    } catch (err) {
+        console.error('init error:', err);
+    } finally {
+        hideLoader();
+        setInterval(updateNowPlaying, 1000);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
 </script>
 </body>
 </html>

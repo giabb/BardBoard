@@ -568,3 +568,56 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .category-inner {
     overflow: hidden;
 }
+
+/* =============================================
+   SCREEN LOADER
+   ============================================= */
+.app-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease, visibility 0.5s;
+}
+
+.loader-content {
+    text-align: center;
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+}
+
+.loader-dragon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.loader-ouroboros {
+    width: 96px;
+    height: 96px;
+    display: block;
+    margin: 0 auto 1rem;
+    animation: spin 2.8s linear infinite;
+    filter: drop-shadow(0 0 12px var(--gold-glow));
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Class to hide the loader */
+.app-loader.loaded {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* Initially hide the main content slightly to prevent flashes */
+body:not(.ready) .app-header,
+body:not(.ready) .soundboard,
+body:not(.ready) .app-footer {
+    display: none;
+}
