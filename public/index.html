@@ -30,7 +30,7 @@
     <div id="appLoader" class="app-loader">
         <div class="loader-content">
             <img class="loader-ouroboros" src="/ouroboros.svg" alt="Loading">
-            <p>Preparing the Tavern...</p>
+            <p id="loaderMessage">Preparing the Tavern...</p>
         </div>
     </div>
 
@@ -120,6 +120,22 @@
 function showLoader() {
     const loaderEl = document.getElementById('appLoader');
     if (!loaderEl) return;
+    const msgEl = document.getElementById('loaderMessage');
+    if (msgEl) {
+        const messages = [
+            'Rolling initiative...',
+            'Sharpening your lute strings...',
+            'Summoning the tavern playlist...',
+            'Polishing the bardic armor...',
+            'Feeding the mimic jukebox...',
+            'Consulting the dungeon DJ...',
+            'Refilling the potion of volume...',
+            'Taming the dragon speakers...',
+            'Warming up the dice of destiny...',
+            'Checking the spellbook of tracks...'
+        ];
+        msgEl.textContent = messages[Math.floor(Math.random() * messages.length)];
+    }
     document.body.classList.remove('ready');
     loaderEl.classList.remove('loaded');
 }
@@ -478,23 +494,28 @@ function syncPauseState() {
         .catch(err => console.error('pause-status error:', err));
 }
 
+const DEBUG_LOADER_MS = 0;
+
 async function initApp() {
-    showLoader();
-    try {
-        await ensureEnvConfig();
-        await loadAudioButtons();
-        await Promise.all([
-            updateNowPlaying(),
-            syncRepeatState(),
-            syncVolumeState(),
-            syncPauseState()
-        ]);
-    } catch (err) {
-        console.error('init error:', err);
-    } finally {
-        hideLoader();
-        setInterval(updateNowPlaying, 1000);
+  showLoader();
+  try {
+    await ensureEnvConfig();
+    await loadAudioButtons();
+    await Promise.all([
+      updateNowPlaying(),
+      syncRepeatState(),
+      syncVolumeState(),
+      syncPauseState()
+    ]);
+    if (DEBUG_LOADER_MS > 0) {
+      await new Promise(r => setTimeout(r, DEBUG_LOADER_MS));
     }
+  } catch (err) {
+    console.error('init error:', err);
+  } finally {
+    hideLoader();
+    setInterval(updateNowPlaying, 1000);
+  }
 }
 
 if (document.readyState === 'loading') {
