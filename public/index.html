@@ -433,8 +433,19 @@ function syncRepeatState() {
         .catch(err => console.error('repeat-status error:', err));
 }
 
+function syncVolumeState() {
+    if (!window.ENV || !window.ENV.channelId) return;
+    fetch('/get-volume?channelId=' + encodeURIComponent(window.ENV.channelId))
+        .then(r => r.json())
+        .then(data => {
+            const volumeSlider = document.getElementById('volumeSlider');
+            volumeSlider.value = (data.volume || 0.5) * 100;
+        })
+        .catch(err => console.error('get-volume error:', err));
+}
+
 setInterval(updateNowPlaying, 1000);
-setTimeout(() => { updateNowPlaying(); syncRepeatState(); }, 800);
+setTimeout(() => { updateNowPlaying(); syncRepeatState(); syncVolumeState(); }, 800);
 </script>
 </body>
 </html>

@@ -220,6 +220,24 @@ app.post('/set-volume', (req, res) => {
 });
 
 /**
+ * Handles the `/get-volume` API endpoint to retrieve the current volume
+ * for the audio playback in the Discord bot.
+ *
+ * @route GET /get-volume
+ * @param {string} channelId - The ID of the Discord channel.
+ * @returns {number} volume - The current volume (0.0 to 1.0, default 0.5).
+ */
+app.get('/get-volume', (req, res) => {
+  const { channelId } = req.query;
+  const channel = discordClient.channels.cache.get(channelId);
+  if (!channel) return res.json({ volume: 0.5 });
+
+  const guildId = channel.guild.id;
+  const volume = currentVolume.get(guildId) || 0.5;
+  res.json({ volume });
+});
+
+/**
  * Handles the `/seek` API endpoint to jump playback to a
  * specific position within the currently playing track.
  * Stops the current resource and replays from the requested offset
