@@ -49,7 +49,7 @@ Before you start, make sure you have these:
 
 - **A Discord account** and a server where you want to use it
 - **Docker Desktop** installed on your computer — [download it here](https://docs.docker.com/get-docker/) (it's free)
-- **A Discord Bot Token** — don't worry, we'll walk you through creating one below
+- **A Discord Bot Token** — don't worry, I'll walk you through creating one below
 
 That's it. No coding required.
 
@@ -121,6 +121,8 @@ audio-files/
 
 This would give you a soundboard with a few loose sounds at the top, then a **Combat** section, then an **NPCs** section — each with their own buttons.
 
+The categories can be collapsed and expanded
+
 ---
 
 ## 🎮 How to Use It
@@ -134,6 +136,7 @@ The main area of the page is your soundboard — a grid of buttons, one per soun
 ### The Controls (top bar)
 
 - 🔊 **Volume slider** — Drag it left or right to adjust how loud the sound plays in Discord. Changes apply instantly.
+- ⏸️ **Pause / ▶️ Resume** — Tap this to pause the current sound and to enable resume button. Tap again to resume the song.
 - 🔁 **Repeat** — Tap this to loop the current sound. It'll keep playing on repeat until you stop it or play something else. Tap again to turn it off.
 - ⏹️ **Stop** — Stops whatever is currently playing.
 
@@ -186,7 +189,7 @@ Here's what's on the horizon for BardBoard:
 
 ## 🤝 Contributing
 
-BardBoard is open source and we welcome contributions! Whether it's a bug fix, a new feature, or just a typo in the docs — it all helps.
+BardBoard is open source and contributions are welcome! Whether it's a bug fix, a new feature, or just a typo in the docs — it all helps.
 
 ### 🐛 Found a Bug?
 Open an [issue](https://github.com/giabb/BardBoard/issues) and describe what happened. Include any error messages you see (you can get them with `docker compose logs -f`).
