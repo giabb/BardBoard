@@ -30,7 +30,7 @@ Play sound effects, ambient music, and voice lines directly into your voice chan
 
 BardBoard is a Discord bot with a built-in web soundboard. You open it in your browser, see all your sounds laid out as buttons, and tap one — it plays instantly in your Discord voice channel. Everyone in the channel hears it.
 
-![BardBoard GUI](https://i.ibb.co/GQqJvB2z/bardboard.png)
+![BardBoard GUI](https://i.ibb.co/1GR4j4Sc/immagine.png)
 
 It's designed with tabletop RPG sessions in mind (think ambient tavern music, dramatic battle effects, NPC voices), but it works great for anything where you want to drop sounds into a group call.
 
@@ -116,7 +116,7 @@ audio-files/
 
 This would give you a soundboard with a few loose sounds at the top, then a **Combat** section, then an **NPCs** section — each with their own buttons.
 
-The categories can be collapsed and expanded
+The categories can be collapsed and expanded, and each category has its own colour!
 
 ---
 
