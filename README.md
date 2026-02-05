@@ -179,7 +179,6 @@ Here's what's on the horizon for BardBoard:
 - [ ] 🎶 **Playlist mode** — Queue up multiple sounds and let them play one after another
 - [ ] 💬 **Discord slash commands** — Play sounds with `/play` directly in chat, in addition to the web UI
 - [ ] 🌐 **Multi-channel support** — Run separate soundboards for different voice channels at the same time
-- [ ] 🎨 **Category colours** — Give each category its own colour theme on the soundboard
 - [ ] 📤 **In-browser uploads** — Add sounds by dragging and dropping files right onto the web UI
 - [ ] ✨ **Make things simpler** — I know the whole setup can be a lot for most of the users, so I hope to make things easier in the future! 
 
