@@ -347,6 +347,55 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 /* =============================================
    SOUNDBOARD / TRACK GRID
    ============================================= */
+.search-bar {
+    margin-bottom: 22px;
+}
+
+.search-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-glass);
+    background: var(--bg-card);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+
+.search-field:focus-within {
+    border-color: rgba(212,168,67,0.5);
+    box-shadow: 0 0 0 2px rgba(212,168,67,0.2);
+    background: var(--bg-card-hover);
+}
+
+.search-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+#trackSearch {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+}
+
+#trackSearch::placeholder {
+    color: var(--text-muted);
+}
+
+.is-hidden {
+    display: none !important;
+}
+
 .soundboard {
     position: relative;
     z-index: 1;

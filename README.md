@@ -83,12 +83,7 @@ That's it. No coding required.
 ### Step 5 — Start It Up
 
 1. Open a terminal (or PowerShell on Windows) in the BardBoard folder
-2. Run this single command:
-
-```
-docker compose up --build -d
-```
-
+2. Run this single command: `docker compose up --build -d`
 3. Wait a few seconds for it to start up
 4. Open your browser and go to **http://localhost:3000**
 
@@ -131,7 +126,7 @@ Open **http://localhost:3000** in any browser on your network. Here's what you'l
 
 ### The Soundboard
 
-The main area of the page is your soundboard — a grid of buttons, one per sound. Just **tap or click** a button and it plays in your Discord voice channel immediately. The button for the currently playing sound lights up so you always know what's on.
+The main area of the page is your soundboard — a grid of buttons, one per sound, optionally divided by categories. Just **tap or click** a button and it plays in your Discord voice channel immediately. The button for the currently playing sound lights up so you always know what's on.
 
 ### The Controls (top bar)
 
@@ -143,6 +138,10 @@ The main area of the page is your soundboard — a grid of buttons, one per soun
 ### Now Playing Bar
 
 Right below the controls you'll see a strip that shows you what's playing right now, along with a **progress bar**. You can **click or drag** anywhere on that bar to jump to a different part of the sound — handy if you want to skip to a specific moment in a longer track.
+
+### Search Bar
+
+Below the playing bar, you can find a search bar. This bar filters songs and categories.
 
 ### Using It on Mobile
 
@@ -182,7 +181,6 @@ Here's what's on the horizon for BardBoard:
 - [ ] 🌐 **Multi-channel support** — Run separate soundboards for different voice channels at the same time
 - [ ] 🎨 **Category colours** — Give each category its own colour theme on the soundboard
 - [ ] 📤 **In-browser uploads** — Add sounds by dragging and dropping files right onto the web UI
-- [ ] 🔍 **Search** — Filter your sounds in real time as your library grows
 - [ ] ✨ **Make things simpler** — I know the whole setup can be a lot for most of the users, so I hope to make things easier in the future! 
 
 ---
