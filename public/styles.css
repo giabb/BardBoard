@@ -35,6 +35,7 @@
     --radius-card:   16px;
     --radius-btn:    12px;
     --transition:    0.25s cubic-bezier(.4,0,.2,1);
+    --cat-color:     var(--gold);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -319,7 +320,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .np-bar-fill {
     position: absolute;
     top: 0; left: 0; bottom: 0;
-    width: 0%;
+    width: 0;
     background: linear-gradient(90deg, var(--accent-violet), var(--gold));
     border-radius: 2px;
     pointer-events: none;
@@ -330,7 +331,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .np-bar-thumb {
     position: absolute;
     top: 50%;
-    left: 0%;
+    left: 0;
     width: 14px; height: 14px;
     background: var(--gold-light);
     box-shadow: 0 0 6px var(--gold-glow);
@@ -519,7 +520,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     margin: 40px 0 20px;
     font-family: 'Cinzel', serif;
     font-size: 1.4rem;
-    color: var(--gold);
+    color: var(--cat-color, var(--gold));
     display: flex;
     align-items: center;
     gap: 15px;
@@ -533,7 +534,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     content: '';
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, var(--gold-glow), transparent);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--cat-color, var(--gold)) 60%, transparent), transparent);
     opacity: 0.3;
 }
 
@@ -592,6 +593,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     width: 24px;
     height: 24px;
     opacity: 0.6;
+    color: var(--cat-color, var(--gold));
     transition: transform 0.3s cubic-bezier(.4,0,.2,1);
     order: 2; /* Ensure it sits between text and the line if needed, or adjust flex */
 }
@@ -616,6 +618,21 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 /* Required to hide content when grid-row is 0 */
 .category-inner {
     overflow: hidden;
+}
+
+.cat-colored .track-btn::before {
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cat-color, var(--accent-violet)) 70%, transparent), transparent);
+}
+
+.cat-colored .track-btn:hover {
+    border-color: color-mix(in srgb, var(--cat-color, var(--accent-violet)) 55%, rgba(255,255,255,0.1));
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3), 0 0 12px color-mix(in srgb, var(--cat-color, var(--accent-violet)) 25%, transparent);
+}
+
+.cat-colored .track-btn.playing {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--cat-color, var(--gold)) 22%, transparent), rgba(139,92,246,0.12));
+    border-color: color-mix(in srgb, var(--cat-color, var(--gold)) 70%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--cat-color, var(--gold)) 35%, transparent), 0 4px 16px rgba(0,0,0,0.3);
 }
 
 /* =============================================

@@ -62,6 +62,35 @@ async function loadAudioButtons() {
     const container = document.getElementById('audioButtons');
     container.innerHTML = ''; // Clear loading state if any
 
+    const categoryPalette = [
+    '#8b5cf6', // Purple
+    '#d4a843', // Gold
+    '#e05d8a', // Pink
+    '#5aa8d6', // Blue
+    '#6fbf9a', // Teal/Green
+    '#ef4444', // Red
+    '#f59e0b', // Orange/Amber
+    '#a855f7', // Bright Purple
+    '#ec4899', // Hot Pink
+    '#14b8a6', // Cyan
+    '#10b981', // Emerald
+    '#f97316', // Bright Orange
+    '#06b6d4', // Sky Blue
+    '#eab308', // Yellow
+    '#84cc16', // Lime
+    ];
+
+    const categoryColorMap = new Map();
+    let colorIndex = 0;
+
+    const getCategoryColor = (name) => {
+        if (!categoryColorMap.has(name)) {
+            categoryColorMap.set(name, categoryPalette[colorIndex % categoryPalette.length]);
+            colorIndex++;
+        }
+        return categoryColorMap.get(name);
+    };
+
     // Helper to create a grid of buttons
     const createGrid = (files, animationOffset = 0) => {
         const grid = document.createElement('div');
@@ -100,7 +129,10 @@ async function loadAudioButtons() {
 
     // Render Root Files (Uncategorized)
     if (data.root && data.root.length > 0) {
-        container.appendChild(createGrid(data.root, globalCount));
+        const rootGrid = createGrid(data.root, globalCount);
+        rootGrid.classList.add('cat-colored');
+        rootGrid.style.setProperty('--cat-color', getCategoryColor('__root__'));
+        container.appendChild(rootGrid);
         globalCount += data.root.length;
     }
 
@@ -112,6 +144,8 @@ async function loadAudioButtons() {
             // Create the Header with a toggle
             const header = document.createElement('h2');
             header.className = 'category-header';
+            const catColor = getCategoryColor(folderName);
+            header.style.setProperty('--cat-color', catColor);
             header.innerHTML = `
                 <span>${folderName}</span>
                 <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -121,7 +155,8 @@ async function loadAudioButtons() {
 
             // Create a wrapper for the collapsible effect
             const wrapper = document.createElement('div');
-            wrapper.className = 'category-wrapper'; // Default state: Open
+            wrapper.className = 'category-wrapper cat-colored'; // Default state: Open
+            wrapper.style.setProperty('--cat-color', catColor);
 
             const inner = document.createElement('div');
             inner.className = 'category-inner';
