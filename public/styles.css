@@ -510,7 +510,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     from { transform: translateY(0); }
     to   { transform: translateY(-3px); }
 }
-.track-btn.playing .track-label { color: var(--gold-light); }
+.track-btn.playing .track-label { color: color-mix(in srgb, var(--cat-color) 70%, var(--text-primary)); }
 
 /* =============================================
    CATEGORY HEADERS
