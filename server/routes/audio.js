@@ -16,23 +16,52 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 const express = require('express');
+const rateLimit = require('express-rate-limit');
+const { resolveAudioPath, hasAllowedExt } = require('../utils/path');
 
 function createAudioRoutes(audioService) {
   const router = express.Router();
+  const limiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Number.parseInt(process.env.RATE_LIMIT_AUDIO || '120', 10),
+    standardHeaders: 'draft-7',
+    legacyHeaders: false
+  });
+
+  function isValidChannelId(channelId) {
+    return typeof channelId === 'string' && /^\d{17,20}$/.test(channelId);
+  }
+
+  function normalizeFileName(raw) {
+    if (!raw) return null;
+    const relPath = raw.toString().replace(/\\/g, '/');
+    if (relPath.includes('..') || relPath.startsWith('/')) return null;
+    if (!hasAllowedExt(relPath)) return null;
+    const fullPath = resolveAudioPath(relPath);
+    if (!fullPath) return null;
+    return relPath;
+  }
+
+  router.use(limiter);
 
   router.get('/repeat-status', (req, res) => {
     const { channelId } = req.query;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     res.json(audioService.getRepeatStatus(channelId));
   });
 
   router.post('/play-audio', (req, res) => {
     const { fileName, channelId } = req.body;
-    audioService.playAudioInDiscord(fileName, channelId);
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const safeFile = normalizeFileName(fileName);
+    if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
+    audioService.playAudioInDiscord(safeFile, channelId);
     res.sendStatus(200);
   });
 
   router.post('/toggle-pause', (req, res) => {
     const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const result = audioService.togglePause(channelId);
     if (!result) return res.sendStatus(404);
     res.json(result);
@@ -40,17 +69,20 @@ function createAudioRoutes(audioService) {
 
   router.get('/pause-status', (req, res) => {
     const { channelId } = req.query;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     res.json(audioService.getPauseStatus(channelId));
   });
 
   router.post('/stop-audio', (req, res) => {
     const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     audioService.stopAudioInDiscord(channelId);
     res.sendStatus(200);
   });
 
   router.post('/toggle-repeat', (req, res) => {
     const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const newState = audioService.toggleRepeat(channelId);
     if (newState === null) return res.sendStatus(404);
     res.json({ repeatEnabled: newState });
@@ -58,19 +90,30 @@ function createAudioRoutes(audioService) {
 
   router.post('/set-volume', (req, res) => {
     const { channelId, volume } = req.body;
-    audioService.setCurrentVolume(channelId, volume);
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const volumeValue = Number(volume);
+    if (!Number.isFinite(volumeValue) || volumeValue < 0 || volumeValue > 1) {
+      return res.status(400).json({ error: 'Invalid volume' });
+    }
+    audioService.setCurrentVolume(channelId, volumeValue);
     res.sendStatus(200);
   });
 
   router.get('/get-volume', (req, res) => {
     const { channelId } = req.query;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     res.json(audioService.getVolume(channelId));
   });
 
   router.post('/seek', async (req, res) => {
     const { channelId, offsetSecs } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const offsetValue = Number(offsetSecs);
+    if (!Number.isFinite(offsetValue) || offsetValue < 0) {
+      return res.status(400).json({ error: 'Invalid offsetSecs' });
+    }
     try {
-      const ok = await audioService.seek(channelId, offsetSecs);
+      const ok = await audioService.seek(channelId, offsetValue);
       if (!ok) return res.sendStatus(404);
       res.sendStatus(200);
     } catch (err) {
@@ -81,6 +124,7 @@ function createAudioRoutes(audioService) {
 
   router.get('/now-playing', async (req, res) => {
     const { channelId } = req.query;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     res.json(await audioService.nowPlaying(channelId));
   });
 

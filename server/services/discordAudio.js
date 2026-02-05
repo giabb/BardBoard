@@ -21,6 +21,7 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType, No
 const sodium = require('libsodium-wrappers');
 const musicmetadata = require('music-metadata');
 const { AUDIO_DIR } = require('../constants');
+const { resolveAudioPath, hasAllowedExt } = require('../utils/path');
 
 function createDiscordAudioService(discordClient) {
   const activeAudioPlayers = new Map();
@@ -71,6 +72,9 @@ function createDiscordAudioService(discordClient) {
     await sodium.ready;
     const channel = getChannel(channelId);
     if (!channel) return false;
+    if (!hasAllowedExt(fileName)) return false;
+    const safePath = resolveAudioPath(fileName);
+    if (!safePath) return false;
 
     try {
       const existingPlayer = activeAudioPlayers.get(channel.guild.id);
@@ -105,7 +109,7 @@ function createDiscordAudioService(discordClient) {
 
       currentAudioFile.set(channel.guild.id, fileName);
 
-      const resource = createAudioResource(path.join(AUDIO_DIR, fileName), { inlineVolume: true });
+      const resource = createAudioResource(safePath, { inlineVolume: true });
 
       const volume = currentVolume.get(channel.guild.id) || 0.5;
       resource.volume.setVolume(volume);
@@ -123,7 +127,12 @@ function createDiscordAudioService(discordClient) {
           if (repeatEnabled.get(channel.guild.id)) {
             const currentFile = currentAudioFile.get(channel.guild.id);
             if (currentFile) {
-              const newResource = createAudioResource(path.join(AUDIO_DIR, currentFile), { inlineVolume: true });
+              const repeatPath = resolveAudioPath(currentFile);
+              if (!repeatPath) {
+                cleanupPlayerOnly(channel.guild.id);
+                return;
+              }
+              const newResource = createAudioResource(repeatPath, { inlineVolume: true });
               newResource.volume.setVolume(currentVolume.get(channel.guild.id) || 0.5);
               activeAudioResources.set(channel.guild.id, newResource);
               playStartTime.set(channel.guild.id, Date.now());
@@ -239,7 +248,8 @@ function createDiscordAudioService(discordClient) {
     if (!fileName || !player) return false;
 
     const volume = currentVolume.get(guildId) || 0.5;
-    const filePath = path.resolve(AUDIO_DIR, fileName);
+    const filePath = resolveAudioPath(fileName);
+    if (!filePath) return false;
 
     const ffmpeg = spawn('ffmpeg', [
       '-ss', String(offsetSecs),
@@ -285,7 +295,9 @@ function createDiscordAudioService(discordClient) {
     let duration = trackDurations.get(fileName);
     if (duration === undefined) {
       try {
-        const metadata = await musicmetadata.parseFile(path.join(AUDIO_DIR, fileName));
+        const safePath = resolveAudioPath(fileName);
+        if (!safePath) return { song: null, elapsed: 0, duration: 0, paused: false };
+        const metadata = await musicmetadata.parseFile(safePath);
         duration = metadata.format.duration || 0;
       } catch {
         duration = 0;

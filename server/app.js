@@ -18,6 +18,8 @@
 const express = require('express');
 const path = require('path');
 const { Events, Client, GatewayIntentBits } = require('discord.js');
+const helmet = require('helmet');
+const cors = require('cors');
 const session = require('express-session');
 const { createDiscordAudioService } = require('./services/discordAudio');
 const createAudioRoutes = require('./routes/audio');
@@ -40,7 +42,21 @@ const authUser = process.env.AUTH_USER || '';
 const authPass = process.env.AUTH_PASS || '';
 const rememberDays = Math.max(1, Number.parseInt(process.env.LOGIN_REMEMBER_DAYS || '30', 10));
 const authEnabled = authUser && authPass;
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
+app.use(helmet({ contentSecurityPolicy: false }));
+if (corsOrigins.length > 0) {
+  app.use(cors({
+    origin: (origin, cb) => {
+      if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+  }));
+}
 app.use(session({
   secret: process.env.SESSION_SECRET || 'change-me',
   resave: false,

@@ -21,6 +21,8 @@ const multer = require('multer');
 const { AUDIO_DIR, ALLOWED_EXT } = require('../constants');
 const { sanitizeCategory } = require('../utils/path');
 
+const maxUploadMb = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -37,6 +39,9 @@ const upload = multer({
       cb(null, path.basename(file.originalname));
     }
   }),
+  limits: {
+    fileSize: maxUploadMb * 1024 * 1024
+  },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_EXT.has(ext)) {

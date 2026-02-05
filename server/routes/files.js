@@ -18,11 +18,20 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const upload = require('../middleware/upload');
 const { AUDIO_DIR } = require('../constants');
 const { sanitizeCategory, resolveAudioPath, hasAllowedExt } = require('../utils/path');
 
 const router = express.Router();
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number.parseInt(process.env.RATE_LIMIT_FILES || '60', 10),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false
+});
+
+router.use(limiter);
 
 /**
  * Handles the `/audio-files` API endpoint to return a list of audio files

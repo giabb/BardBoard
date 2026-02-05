@@ -25,7 +25,8 @@ function sanitizeCategory(raw) {
 
 function resolveAudioPath(relativePath) {
   const fullPath = path.resolve(AUDIO_DIR, relativePath);
-  if (!fullPath.startsWith(AUDIO_DIR)) return null;
+  if (fullPath === AUDIO_DIR) return fullPath;
+  if (!fullPath.startsWith(AUDIO_DIR + path.sep)) return null;
   return fullPath;
 }
 
