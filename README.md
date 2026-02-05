@@ -79,6 +79,9 @@ That's it. No coding required.
 1. Download or clone this repository to a folder on your computer
 2. Inside that folder, copy the file `.env.sample` and rename it to `.env`
 3. Open it and replace the values with your own Discord Bot Token and Voice Channel ID retrieved in Step 1 and 3.
+4. (Optional) Enable the login screen by setting:
+   - `AUTH_USER` / `AUTH_PASS` for the credentials
+   - `SESSION_SECRET` to a long random string (32+ chars)
 
 ### Step 5 — Start It Up
 
@@ -170,6 +173,10 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 **The bot isn't online in Discord**
 - Double-check your `DISCORD_TOKEN` in the `.env` file — make sure there are no extra spaces or line breaks
 - Try restarting with `docker compose restart`
+
+**I don't see the login screen**
+- Make sure both `AUTH_USER` and `AUTH_PASS` are set (auth is off if either is empty)
+- Restart the container after changing `.env`
 
 **I changed my sounds but they didn't update**
 - The soundboard reads files live, so new files should appear on the next page refresh. If they don't, make sure the files are inside the `audio-files/` folder or a first level subfolder (not a subfolder of a subfolder and so on)
