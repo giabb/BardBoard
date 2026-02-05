@@ -6,10 +6,10 @@
 *.wav
 *.ogg
 *.m4a
-!audio-files/audio-subfolder/bonus.mp3
-!audio-files/test1.mp3
-!audio-files/test2.mp3
-!audio-files/test3.mp3
+!audio-files/bonus.mp3
+!audio-files/ambient/test1.mp3
+!audio-files/combat/test2.mp3
+!audio-files/dialogue/test3.mp3
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
