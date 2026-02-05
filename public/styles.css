@@ -55,6 +55,8 @@ body {
 a { color: var(--gold); text-decoration: none; transition: color var(--transition); }
 a:hover { color: var(--gold-light); text-decoration: underline; }
 
+.is-hidden { display: none !important; }
+
 /* =============================================
    AMBIENT BACKGROUND
    ============================================= */
@@ -63,14 +65,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    /* subtle radial orbs */
     background:
         radial-gradient(ellipse 60% 50% at 15% 30%,  rgba(139,92,246,0.10) 0%, transparent 70%),
         radial-gradient(ellipse 50% 45% at 80% 70%,  rgba(224,93,138,0.08) 0%, transparent 70%),
         radial-gradient(ellipse 40% 35% at 50% 10%,  rgba(212,168,67,0.06) 0%, transparent 70%);
 }
 
-/* floating dust particles */
 .particle {
     position: absolute;
     border-radius: 50%;
@@ -86,13 +86,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .particle:nth-child(6) { width:2px; height:2px; left:82%; top:88%; animation-duration:19s; animation-delay:7s; }
 .particle:nth-child(7) { width:4px; height:4px; left:5%;  top:70%; animation-duration:17s; animation-delay:4s; }
 .particle:nth-child(8) { width:2px; height:2px; left:92%; top:60%; animation-duration:21s; animation-delay:6s; }
-
-@keyframes float {
-    0%   { transform: translateY(0)  translateX(0);   opacity: 0; }
-    10%  { opacity: 0.6; }
-    90%  { opacity: 0.6; }
-    100% { transform: translateY(-110vh) translateX(40px); opacity: 0; }
-}
 
 /* =============================================
    HEADER
@@ -117,7 +110,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     flex-wrap: wrap;
 }
 
-/* Brand */
 .brand {
     display: flex;
     align-items: center;
@@ -134,14 +126,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 .brand-title .ampersand { color: var(--accent-violet); }
 
-/* Controls row */
 .controls {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-/* Volume */
 .volume-group {
     display: flex;
     align-items: center;
@@ -184,7 +174,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     cursor: pointer;
 }
 
-/* Control buttons */
 .ctrl-btn {
     display: inline-flex;
     align-items: center;
@@ -229,7 +218,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     box-shadow: 0 0 14px rgba(220,50,50,0.3);
 }
 
-/* Pause Button specific styling */
 .ctrl-pause.paused {
     background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(139, 92, 246, 0.15));
     border-color: var(--accent-violet);
@@ -269,10 +257,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     box-shadow: 0 0 8px rgba(74,222,128,0.6);
     animation: pulse-dot 1.6s ease-in-out infinite;
 }
-@keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.4; }
-}
 
 .np-label  { color: var(--text-muted); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.75rem; }
 .np-divider { color: var(--text-muted); opacity: 0.5; font-size: 1.1rem; }
@@ -283,9 +267,8 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     font-weight: 600;
 }
 
-/* ── Progress row (seekable bar + timestamps) ── */
 .np-progress-row {
-    display: none;                          /* hidden until .visible */
+    display: none;
     width: 100%;
     align-items: center;
     gap: 10px;
@@ -297,13 +280,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .np-time {
     color: var(--text-muted);
     font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;     /* digits don't jump around */
+    font-variant-numeric: tabular-nums;
     min-width: 36px;
     white-space: nowrap;
 }
 .np-time:last-child { text-align: right; }
 
-/* the clickable/draggable rail */
 .np-bar-track {
     position: relative;
     flex: 1;
@@ -314,9 +296,8 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: height 0.2s;
 }
 .np-bar-track:hover,
-.np-bar-track.dragging { height: 6px; }   /* fatten on hover / drag */
+.np-bar-track.dragging { height: 6px; }
 
-/* filled portion */
 .np-bar-fill {
     position: absolute;
     top: 0; left: 0; bottom: 0;
@@ -327,7 +308,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: width 0.25s linear;
 }
 
-/* draggable thumb – invisible until hover/drag, then pops in */
 .np-bar-thumb {
     position: absolute;
     top: 50%;
@@ -346,8 +326,18 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 /* =============================================
-   SOUNDBOARD / TRACK GRID
+   SOUNDBOARD LAYOUT
    ============================================= */
+.soundboard {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    max-width: 1140px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 36px 24px 48px;
+}
+
 .search-bar {
     margin-bottom: 22px;
     display: flex;
@@ -396,10 +386,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     color: var(--text-muted);
 }
 
-.is-hidden {
-    display: none !important;
-}
-
 .upload-bar {
     margin: 0 0 26px;
     display: flex;
@@ -412,6 +398,9 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     padding: 8px 14px;
 }
 
+/* =============================================
+   UPLOAD MODAL
+   ============================================= */
 .upload-modal {
     position: fixed;
     inset: 0;
@@ -424,9 +413,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     z-index: 9998;
 }
 
-.upload-modal.open {
-    display: flex;
-}
+.upload-modal.open { display: flex; }
 
 .upload-panel {
     width: min(520px, 92vw);
@@ -480,9 +467,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     z-index: 2;
 }
 
-.upload-loading.show {
-    display: flex;
-}
+.upload-loading.show { display: flex; }
 
 .upload-ouroboros {
     width: 90px;
@@ -622,6 +607,9 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     justify-content: flex-end;
 }
 
+/* =============================================
+   STATUS MODAL
+   ============================================= */
 .status-modal {
     position: fixed;
     inset: 0;
@@ -634,9 +622,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     z-index: 9999;
 }
 
-.status-modal.open {
-    display: flex;
-}
+.status-modal.open { display: flex; }
 
 .status-panel {
     width: min(440px, 90vw);
@@ -665,23 +651,15 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     justify-content: center;
 }
 
-.soundboard {
-    position: relative;
-    z-index: 1;
-    flex: 1;
-    max-width: 1140px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 36px 24px 48px;
-}
-
+/* =============================================
+   TRACK GRID
+   ============================================= */
 .track-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 14px;
 }
 
-/* ── Track Button ── */
 .track-btn {
     position: relative;
     display: flex;
@@ -707,7 +685,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
         border-color var(--transition),
         box-shadow var(--transition),
         transform var(--transition);
-    /* staggered entrance */
     animation: card-pop 0.45s cubic-bezier(.4,0,.2,1) both;
     overflow: hidden;
 }
@@ -752,7 +729,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transform: translateY(-1px);
 }
 
-/* decorative top-edge accent line */
 .track-btn::before {
     content: '';
     position: absolute;
@@ -763,11 +739,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: opacity var(--transition);
 }
 
-@keyframes card-pop {
-    from { opacity: 0; transform: translateY(18px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(0)    scale(1);    }
-}
-
 .track-btn:hover {
     background: var(--bg-card-hover);
     border-color: rgba(139,92,246,0.3);
@@ -776,14 +747,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 .track-btn:hover::before { opacity: 1; }
 
-/* pressed flash */
 .track-btn.pressed {
     transform: translateY(0) scale(0.96) !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 2px 6px rgba(0,0,0,0.3) !important;
     transition-duration: 0.1s !important;
 }
 
-/* icon */
 .track-icon {
     font-size: 1.25rem;
     color: var(--accent-violet);
@@ -796,10 +765,8 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transform: scale(1.15);
 }
 
-/* label */
 .track-label { position: relative; z-index: 1; text-align: center; line-height: 1.3; }
 
-/* ── Currently Playing state ── */
 .track-btn.playing {
     background: linear-gradient(145deg, rgba(212,168,67,0.18), rgba(139,92,246,0.14));
     border-color: var(--gold);
@@ -814,14 +781,10 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     opacity: 1;
     animation: icon-bounce 0.8s ease-in-out infinite alternate;
 }
-@keyframes icon-bounce {
-    from { transform: translateY(0); }
-    to   { transform: translateY(-3px); }
-}
 .track-btn.playing .track-label { color: color-mix(in srgb, var(--cat-color) 70%, var(--text-primary)); }
 
 /* =============================================
-   CATEGORY HEADERS
+   CATEGORIES
    ============================================= */
 .category-header {
     width: 100%;
@@ -835,6 +798,8 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     text-shadow: 0 2px 10px rgba(0,0,0,0.5);
     opacity: 0;
     animation: fade-in-up 0.6s ease forwards;
+    cursor: pointer;
+    user-select: none;
 }
 
 .cat-delete {
@@ -869,7 +834,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transform: translateY(-1px);
 }
 
-/* The decorative line after the text */
 .category-header::after {
     content: '';
     flex: 1;
@@ -878,87 +842,30 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     opacity: 0.3;
 }
 
-@keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Remove margin from the very first item if it's a grid */
-.soundboard > .track-grid:first-child { margin-top: 0; }
-
-/* =============================================
-   FOOTER
-   ============================================= */
-.app-footer {
-    position: relative;
-    z-index: 1;
-    text-align: center;
-    padding: 18px 24px;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    border-top: 1px solid var(--border-glass);
-    background: rgba(14,10,20,0.5);
-}
-
-/* =============================================
-   RESPONSIVE
-   ============================================= */
-@media (max-width: 680px) {
-    .header-inner { flex-direction: column; align-items: flex-start; }
-    .brand-title  { font-size: 1.35rem; }
-    .track-grid   { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-    .track-btn    { padding: 22px 8px 18px; }
-    .soundboard   { padding: 24px 16px 40px; }
-}
-
-@media (max-width: 400px) {
-    .track-grid { grid-template-columns: repeat(2, 1fr); }
-    .controls   { gap: 8px; }
-    .ctrl-btn span { display: none; }   /* icon-only on tiny screens */
-    .ctrl-btn     { padding: 8px 10px; }
-}
-
-/* =============================================
-   COLLAPSIBLE CATEGORIES
-   ============================================= */
-
-/* Make the header look clickable */
-.category-header {
-    cursor: pointer;
-    user-select: none; /* Prevent text selection while clicking */
-}
-
-/* Style the chevron/arrow icon */
 .cat-chevron {
     width: 24px;
     height: 24px;
     opacity: 0.6;
     color: var(--cat-color, var(--gold));
     transition: transform 0.3s cubic-bezier(.4,0,.2,1);
-    order: 2; /* Ensure it sits between text and the line if needed, or adjust flex */
+    order: 2;
 }
 
-/* Rotate the arrow when collapsed */
 .category-header.collapsed .cat-chevron {
     transform: rotate(-90deg);
 }
 
-/* The wrapper that holds the grid for animation */
 .category-wrapper {
     display: grid;
     grid-template-rows: 1fr;
     transition: grid-template-rows 0.3s cubic-bezier(.4,0,.2,1);
 }
 
-/* When collapsed, squeeze the row height to 0 */
 .category-wrapper.collapsed {
     grid-template-rows: 0fr;
 }
 
-/* Required to hide content when grid-row is 0 */
-.category-inner {
-    overflow: hidden;
-}
+.category-inner { overflow: hidden; }
 
 .cat-colored .track-btn::before {
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cat-color, var(--accent-violet)) 70%, transparent), transparent);
@@ -973,6 +880,22 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     background: linear-gradient(145deg, color-mix(in srgb, var(--cat-color, var(--gold)) 22%, transparent), rgba(139,92,246,0.12));
     border-color: color-mix(in srgb, var(--cat-color, var(--gold)) 70%, transparent);
     box-shadow: 0 0 18px color-mix(in srgb, var(--cat-color, var(--gold)) 35%, transparent), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.soundboard > .track-grid:first-child { margin-top: 0; }
+
+/* =============================================
+   FOOTER
+   ============================================= */
+.app-footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 18px 24px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-glass);
+    background: rgba(14,10,20,0.5);
 }
 
 /* =============================================
@@ -1011,19 +934,65 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     filter: drop-shadow(0 0 12px var(--gold-glow));
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* Class to hide the loader */
 .app-loader.loaded {
     opacity: 0;
     visibility: hidden;
 }
 
-/* Initially hide the main content slightly to prevent flashes */
 body:not(.ready) .app-header,
 body:not(.ready) .soundboard,
 body:not(.ready) .app-footer {
     display: none;
+}
+
+/* =============================================
+   ANIMATIONS
+   ============================================= */
+@keyframes float {
+    0%   { transform: translateY(0)  translateX(0);   opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.6; }
+    100% { transform: translateY(-110vh) translateX(40px); opacity: 0; }
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+
+@keyframes card-pop {
+    from { opacity: 0; transform: translateY(18px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+@keyframes icon-bounce {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-3px); }
+}
+
+@keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (max-width: 680px) {
+    .header-inner { flex-direction: column; align-items: flex-start; }
+    .brand-title  { font-size: 1.35rem; }
+    .track-grid   { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .track-btn    { padding: 22px 8px 18px; }
+    .soundboard   { padding: 24px 16px 40px; }
+}
+
+@media (max-width: 400px) {
+    .track-grid { grid-template-columns: repeat(2, 1fr); }
+    .controls   { gap: 8px; }
+    .ctrl-btn span { display: none; }
+    .ctrl-btn     { padding: 8px 10px; }
 }
