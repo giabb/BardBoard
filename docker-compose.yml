@@ -23,9 +23,7 @@ services:
     ports:
       - "3000:3000"
     restart: always
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CHANNEL_ID=${CHANNEL_ID}
-      - BOT_PORT=${BOT_PORT}
+    env_file:
+      - .env
     volumes:
       - ./audio-files:/usr/src/app/audio-files

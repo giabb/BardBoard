@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BardBoard Login</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body class="login-page">
+    <div class="ambient-bg" aria-hidden="true">
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+    </div>
+
+    <main class="login-shell">
+      <section class="login-card">
+        <header class="login-brand">
+          <h1 class="login-title">BardBoard <span class="ampersand">&amp;</span> Dragons</h1>
+          <p class="login-subtitle">Sign in to access the soundboard.</p>
+        </header>
+        <form id="login-form" class="login-form" method="post" action="/login">
+          <label class="field-label" for="username">Username</label>
+          <input id="username" name="username" class="field-input login-input" type="text" autocomplete="username" required>
+          <label class="field-label" for="password">Password</label>
+          <input id="password" name="password" class="field-input login-input" type="password" autocomplete="current-password" required>
+          <div class="login-row">
+            <label class="login-remember">
+              <input type="checkbox" name="remember" value="1">
+              Remember me
+            </label>
+          </div>
+          <button type="submit" class="ctrl-btn login-submit">Unlock BardBoard</button>
+          <div id="error" class="login-error" role="alert" aria-live="polite">
+            <strong>Access denied.</strong> The username or password is incorrect.
+          </div>
+          <div class="login-hint">Tip: keep this open on your phone for quick access.</div>
+        </form>
+      </section>
+    </main>
+    <script>
+      const form = document.getElementById('login-form');
+      const error = document.getElementById('error');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        error.style.display = 'none';
+        form.classList.remove('login-failed');
+        const body = new URLSearchParams(new FormData(form));
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body
+        });
+        if (res.redirected) {
+          window.location.href = res.url;
+          return;
+        }
+        if (!res.ok) {
+          error.style.display = 'block';
+          form.classList.add('login-failed');
+        }
+      });
+    </script>
+  </body>
+</html>

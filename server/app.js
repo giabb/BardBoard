@@ -18,6 +18,7 @@
 const express = require('express');
 const path = require('path');
 const { Events, Client, GatewayIntentBits } = require('discord.js');
+const session = require('express-session');
 const { createDiscordAudioService } = require('./services/discordAudio');
 const createAudioRoutes = require('./routes/audio');
 const fileRoutes = require('./routes/files');
@@ -28,7 +29,65 @@ const app = express();
 const discordClient = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const audioService = createDiscordAudioService(discordClient);
 
+function safeEqual(a, b) {
+  const aBuf = Buffer.from(a || '');
+  const bBuf = Buffer.from(b || '');
+  if (aBuf.length !== bBuf.length) return false;
+  return require('crypto').timingSafeEqual(aBuf, bBuf);
+}
+
+const authUser = process.env.AUTH_USER || '';
+const authPass = process.env.AUTH_PASS || '';
+const rememberDays = Math.max(1, Number.parseInt(process.env.LOGIN_REMEMBER_DAYS || '30', 10));
+const authEnabled = authUser && authPass;
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax'
+  }
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+  if (!authEnabled) return res.redirect('/');
+
+  const username = (req.body.username || '').toString();
+  const password = (req.body.password || '').toString();
+  if (!safeEqual(username, authUser) || !safeEqual(password, authPass)) {
+    return res.status(401).send('Invalid username or password');
+  }
+
+  req.session.authenticated = true;
+  if (req.body.remember) {
+    req.session.cookie.maxAge = rememberDays * 24 * 60 * 60 * 1000;
+  }
+  return res.redirect('/');
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/login');
+  });
+});
+
+app.use((req, res, next) => {
+  if (!authEnabled) return next();
+  if (req.session && req.session.authenticated) return next();
+  if (req.path === '/login' || req.path === '/logout') return next();
+  if (req.path === '/styles.css' || req.path === '/ouroboros.svg' || req.path === '/favicon.ico') return next();
+  if (req.accepts('html')) return res.redirect('/login');
+  return res.status(401).json({ error: 'Unauthorized' });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/', (req, res) => {
@@ -48,4 +107,4 @@ discordClient.on(Events.ClientReady, () => {
 
 discordClient.login(process.env.DISCORD_TOKEN);
 
-app.listen(process.env.BOT_PORT, () => console.log('Server running on port', process.env.BOT_PORT));
+app.listen(process.env.BOT_PORT, '0.0.0.0', () => console.log('Server running on port', process.env.BOT_PORT));
