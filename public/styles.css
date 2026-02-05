@@ -699,8 +699,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: opacity var(--transition);
 }
 
-.track-btn:hover .track-actions,
-.track-btn:focus-within .track-actions {
+.track-btn:hover .track-actions {
     opacity: 1;
 }
 
