@@ -25,6 +25,7 @@
     "libsodium-wrappers": "^0.8.2",
     "dotenv": "^17.2.3",
     "music-metadata": "^11.11.2",
+    "multer": "^2.0.2",
     "@snazzah/davey": "^0.1.9"
   },
   "overrides": {

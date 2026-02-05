@@ -108,16 +108,35 @@ async function loadAudioButtons() {
             const searchKey = file.replace(/\.[^/.]+$/, '').replace(/[\\/]/g, ' ').toLowerCase();
             btn.setAttribute('data-track', file.replace(/\.[^/.]+$/, '')); // used for now-playing matching
             btn.setAttribute('data-search', searchKey);
+            btn.setAttribute('data-file', file);
             btn.setAttribute('aria-label', `Play ${displayName}`);
 
             btn.innerHTML = `
                 <span class="track-label">${displayName}</span>
+                <div class="track-actions">
+                    <button class="track-delete" type="button" aria-label="Delete ${displayName}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                        </svg>
+                    </button>
+                </div>
             `;
 
             btn.addEventListener('click', () => {
                 playAudio(file); // Passes "Folder/File.mp3" to server
                 btn.classList.add('pressed');
                 setTimeout(() => btn.classList.remove('pressed'), 200);
+            });
+
+            const delBtn = btn.querySelector('.track-delete');
+            delBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                if (!confirm(`Delete "${displayName}"?`)) return;
+                void deleteAudioFile(file).then(() => refreshAudioList());
             });
 
             grid.appendChild(btn);
@@ -138,8 +157,27 @@ async function loadAudioButtons() {
 
     // Render Categories
     if (data.categories) {
+        const categoryList = document.getElementById('categoryList');
+        const categorySelect = document.getElementById('uploadCategorySelect');
+        if (categoryList) categoryList.innerHTML = '';
+        if (categorySelect) {
+            categorySelect.querySelectorAll('option[data-category]').forEach(opt => opt.remove());
+        }
+
         Object.keys(data.categories).forEach(folderName => {
             const files = data.categories[folderName];
+            if (categoryList) {
+                const opt = document.createElement('option');
+                opt.value = folderName;
+                categoryList.appendChild(opt);
+            }
+            if (categorySelect) {
+                const opt = document.createElement('option');
+                opt.value = folderName;
+                opt.textContent = folderName;
+                opt.setAttribute('data-category', '1');
+                categorySelect.appendChild(opt);
+            }
 
             // Create the Header with a toggle
             const header = document.createElement('h2');
@@ -148,6 +186,15 @@ async function loadAudioButtons() {
             header.style.setProperty('--cat-color', catColor);
             header.innerHTML = `
                 <span>${folderName}</span>
+                <button class="cat-delete" type="button" aria-label="Delete category ${folderName}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        <path d="M10 11v6"></path>
+                        <path d="M14 11v6"></path>
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                    </svg>
+                </button>
                 <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
@@ -172,6 +219,13 @@ async function loadAudioButtons() {
                 wrapper.classList.toggle('collapsed');
             });
 
+            const catDeleteBtn = header.querySelector('.cat-delete');
+            catDeleteBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                if (!confirm(`Delete category "${folderName}" and all its tracks?`)) return;
+                void deleteCategory(folderName).then(() => refreshAudioList());
+            });
+
             // Append everything to the main container
             container.appendChild(header);
             container.appendChild(wrapper);
@@ -179,6 +233,50 @@ async function loadAudioButtons() {
             globalCount += files.length;
         });
     }
+}
+
+function setUploadStatus(message, isError = false) {
+    const statusEl = document.getElementById('uploadStatus');
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.style.color = isError ? '#fca5a5' : '';
+}
+
+function uploadAudio(file, category) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const query = category ? `?category=${encodeURIComponent(category)}` : '';
+    return fetch('/upload-audio' + query, {
+        method: 'POST',
+        body: formData
+    }).then(r => {
+        if (!r.ok) return r.json().then(err => Promise.reject(err));
+        return r.json();
+    });
+}
+
+function deleteAudioFile(path) {
+    return fetch('/audio-file?path=' + encodeURIComponent(path), {
+        method: 'DELETE'
+    }).then(r => {
+        if (!r.ok) return r.json().then(err => Promise.reject(err));
+        return r.json();
+    });
+}
+
+function deleteCategory(name) {
+    return fetch('/audio-category?name=' + encodeURIComponent(name), {
+        method: 'DELETE'
+    }).then(r => {
+        if (!r.ok) return r.json().then(err => Promise.reject(err));
+        return r.json();
+    });
+}
+
+async function refreshAudioList() {
+    await loadAudioButtons();
+    const searchEl = document.getElementById('trackSearch');
+    if (searchEl) applySearchFilter(searchEl.value);
 }
 
 function applySearchFilter(query) {
@@ -238,6 +336,85 @@ function setupSearch() {
     input.addEventListener('input', handler);
     input.addEventListener('search', handler);
     applySearchFilter(input.value);
+}
+
+function setupUpload() {
+    const form = document.getElementById('uploadForm');
+    const modal = document.getElementById('uploadModal');
+    const openBtn = document.getElementById('openUpload');
+    const closeBtn = document.getElementById('closeUpload');
+    const fileInput = document.getElementById('uploadFile');
+    const drop = document.getElementById('uploadDrop');
+    const fileName = document.getElementById('uploadFileName');
+    const selectEl = document.getElementById('uploadCategorySelect');
+    const newEl = document.getElementById('uploadCategoryNew');
+    if (!form || !modal || !openBtn || !closeBtn || !fileInput || !drop || !fileName) return;
+
+    const openModal = () => {
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+    const closeModal = () => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    openBtn.addEventListener('click', () => openModal());
+    closeBtn.addEventListener('click', () => closeModal());
+    modal.addEventListener('click', e => {
+        if (e.target === modal) closeModal();
+    });
+    window.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    const updateFileLabel = () => {
+        const files = fileInput.files ? Array.from(fileInput.files) : [];
+        fileName.textContent = files.length ? files.map(f => f.name).join(', ') : 'No files selected';
+    };
+
+    fileInput.addEventListener('change', updateFileLabel);
+
+    drop.addEventListener('dragover', e => {
+        e.preventDefault();
+        drop.classList.add('dragging');
+    });
+    drop.addEventListener('dragleave', () => drop.classList.remove('dragging'));
+    drop.addEventListener('drop', e => {
+        e.preventDefault();
+        drop.classList.remove('dragging');
+        if (!e.dataTransfer || !e.dataTransfer.files) return;
+        fileInput.files = e.dataTransfer.files;
+        updateFileLabel();
+    });
+
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const files = fileInput.files ? Array.from(fileInput.files) : [];
+        const newCategory = newEl && newEl.value ? newEl.value.trim() : '';
+        const selectedCategory = selectEl ? selectEl.value : '';
+        const category = newCategory || selectedCategory;
+
+        if (!files.length) {
+            setUploadStatus('Select a file first.', true);
+            return;
+        }
+
+        setUploadStatus('Uploading...');
+        try {
+            for (const file of files) {
+                await uploadAudio(file, category);
+            }
+            setUploadStatus('Upload complete.');
+            fileInput.value = '';
+            if (newEl) newEl.value = '';
+            updateFileLabel();
+            closeModal();
+            await refreshAudioList();
+        } catch (err) {
+            setUploadStatus(err.error || 'Upload failed.', true);
+        }
+    });
 }
 
 let isPaused = false;
@@ -500,6 +677,7 @@ async function initApp() {
     await ensureEnvConfig();
     await loadAudioButtons();
     setupSearch();
+    setupUpload();
     await Promise.all([
       updateNowPlaying(),
       syncRepeatState(),

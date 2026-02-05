@@ -112,9 +112,45 @@
                 </svg>
                 <input id="trackSearch" type="search" placeholder="Search tracks or categories..." autocomplete="off" aria-label="Search tracks">
             </div>
+            <button id="openUpload" class="ctrl-btn ctrl-upload">Add Song</button>
+        </div>
+        <div class="upload-bar">
+            <span id="uploadStatus" class="upload-status" aria-live="polite"></span>
         </div>
         <div id="audioButtons"></div>
     </main>
+
+    <div id="uploadModal" class="upload-modal" aria-hidden="true">
+        <div class="upload-panel" role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
+            <div class="upload-head">
+                <h2 id="uploadTitle">Add Songs</h2>
+                <button id="closeUpload" class="upload-close" type="button" aria-label="Close upload">×</button>
+            </div>
+
+            <form id="uploadForm" class="upload-form">
+                <input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden>
+                <label id="uploadDrop" class="upload-drop" for="uploadFile">
+                    <span class="drop-title">Drag a song here</span>
+                    <span class="drop-sub">or <span class="drop-link">browse</span> your files</span>
+                    <span id="uploadFileName" class="drop-file">No files selected</span>
+                </label>
+
+                <div class="upload-fields">
+                    <label class="field-label" for="uploadCategorySelect">Category</label>
+                    <select id="uploadCategorySelect" class="field-select">
+                        <option value="">Root (no category)</option>
+                    </select>
+
+                    <label class="field-label" for="uploadCategoryNew">Or create new</label>
+                    <input id="uploadCategoryNew" class="field-input" placeholder="New category name">
+                </div>
+
+                <div class="upload-actions">
+                    <button type="submit" class="ctrl-btn ctrl-upload">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- ── Footer ── -->
     <footer class="app-footer">

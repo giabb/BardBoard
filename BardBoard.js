@@ -20,6 +20,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const multer = require('multer');
 const { Events, Client, GatewayIntentBits } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType, NoSubscriberBehavior, getVoiceConnection } = require('@discordjs/voice');
 const sodium = require('libsodium-wrappers');
@@ -45,6 +46,46 @@ const pausedElapsed   = new Map();   // guildId → elapsed seconds when paused
 
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from 'public' directory
+
+const AUDIO_DIR = path.join(__dirname, 'audio-files');
+const ALLOWED_EXT = new Set(['.mp3', '.wav', '.ogg', '.m4a']);
+
+function sanitizeCategory(raw) {
+  if (!raw) return '';
+  const cleaned = raw.toString().trim().replace(/[^a-zA-Z0-9 _-]/g, '');
+  return cleaned;
+}
+
+function resolveAudioPath(relativePath) {
+  const fullPath = path.resolve(AUDIO_DIR, relativePath);
+  if (!fullPath.startsWith(AUDIO_DIR)) return null;
+  return fullPath;
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const category = sanitizeCategory(req.query.category);
+      const targetDir = category ? path.join(AUDIO_DIR, category) : AUDIO_DIR;
+      try {
+        fs.mkdirSync(targetDir, { recursive: true });
+        cb(null, targetDir);
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename: (req, file, cb) => {
+      cb(null, path.basename(file.originalname));
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXT.has(ext)) {
+      return cb(new Error('Unsupported file type'));
+    }
+    cb(null, true);
+  }
+});
 
 // Serve the HTML page
 app.get('/', (req, res) => {
@@ -83,7 +124,7 @@ app.get('/repeat-status', (req, res) => {
  * @returns {string[]} A list of audio file names.
  */
 app.get('/audio-files', (req, res) => {
-  const baseDir = './audio-files';
+  const baseDir = AUDIO_DIR;
 
   // Helper to get all items safely
   let entries = [];
@@ -125,6 +166,70 @@ app.get('/audio-files', (req, res) => {
   });
 
   res.json(response);
+});
+
+/**
+ * Handles the `/upload-audio` API endpoint to upload a new audio file.
+ *
+ * @route POST /upload-audio
+ * @query {string} category - Optional category folder name.
+ */
+app.post('/upload-audio', (req, res) => {
+  upload.single('file')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Missing file' });
+    res.json({ ok: true, file: req.file.filename });
+  });
+});
+
+/**
+ * Handles the `/audio-file` API endpoint to delete a specific audio file.
+ *
+ * @route DELETE /audio-file
+ * @query {string} path - Relative path like "Folder/File.mp3" or "File.mp3".
+ */
+app.delete('/audio-file', (req, res) => {
+  const relPath = (req.query.path || '').toString().replace(/\\/g, '/');
+  if (!relPath || relPath.includes('..') || relPath.startsWith('/')) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  const fullPath = resolveAudioPath(relPath);
+  if (!fullPath) return res.status(400).json({ error: 'Invalid path' });
+
+  try {
+    const stat = fs.statSync(fullPath);
+    if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
+    const ext = path.extname(fullPath).toLowerCase();
+    if (!ALLOWED_EXT.has(ext)) return res.status(400).json({ error: 'Invalid file type' });
+    fs.unlinkSync(fullPath);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
+/**
+ * Handles the `/audio-category` API endpoint to delete an entire category.
+ *
+ * @route DELETE /audio-category
+ * @query {string} name - Category folder name.
+ */
+app.delete('/audio-category', (req, res) => {
+  const name = sanitizeCategory(req.query.name);
+  if (!name) return res.status(400).json({ error: 'Invalid category' });
+  const dirPath = resolveAudioPath(name);
+  if (!dirPath || dirPath === AUDIO_DIR) {
+    return res.status(400).json({ error: 'Invalid category' });
+  }
+
+  try {
+    const stat = fs.statSync(dirPath);
+    if (!stat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
+    fs.rmSync(dirPath, { recursive: true, force: true });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(404).json({ error: 'Category not found' });
+  }
 });
 
 /**
