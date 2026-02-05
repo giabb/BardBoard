@@ -236,10 +236,22 @@ async function loadAudioButtons() {
 }
 
 function setUploadStatus(message, isError = false) {
-    const statusEl = document.getElementById('uploadStatus');
-    if (!statusEl) return;
-    statusEl.textContent = message;
-    statusEl.style.color = isError ? '#fca5a5' : '';
+    const modal = document.getElementById('statusModal');
+    const title = document.getElementById('statusTitle');
+    const text = document.getElementById('statusMessage');
+    if (!modal || !title || !text) return;
+    title.textContent = isError ? 'Upload failed' : 'Upload complete';
+    text.textContent = message;
+    text.style.color = isError ? '#fca5a5' : '';
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+function setUploadLoading(isLoading) {
+    const loading = document.getElementById('uploadLoading');
+    if (!loading) return;
+    loading.classList.toggle('show', isLoading);
+    loading.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
 }
 
 function uploadAudio(file, category) {
@@ -346,13 +358,56 @@ function setupUpload() {
     const fileInput = document.getElementById('uploadFile');
     const drop = document.getElementById('uploadDrop');
     const fileName = document.getElementById('uploadFileName');
+    const fileList = document.getElementById('uploadFileList');
     const selectEl = document.getElementById('uploadCategorySelect');
     const newEl = document.getElementById('uploadCategoryNew');
-    if (!form || !modal || !openBtn || !closeBtn || !fileInput || !drop || !fileName) return;
+    const newFields = document.getElementById('newCategoryFields');
+    const statusModal = document.getElementById('statusModal');
+    const statusOk = document.getElementById('statusOk');
+    if (!form || !modal || !openBtn || !closeBtn || !fileInput || !drop || !fileName || !fileList || !statusModal || !statusOk) return;
+
+    let selectedFiles = [];
+
+    const syncInputFiles = () => {
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+    };
+
+    const renderFileList = () => {
+        fileList.innerHTML = '';
+        if (!selectedFiles.length) return;
+        selectedFiles.forEach((file, index) => {
+            const item = document.createElement('div');
+            item.className = 'upload-file-item';
+            item.innerHTML = `
+                <span class="upload-file-name">${file.name}</span>
+                <button class="upload-file-remove" type="button" aria-label="Remove ${file.name}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        <path d="M10 11v6"></path>
+                        <path d="M14 11v6"></path>
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                    </svg>
+                </button>
+            `;
+            const removeBtn = item.querySelector('.upload-file-remove');
+            removeBtn.addEventListener('click', () => {
+                selectedFiles.splice(index, 1);
+                syncInputFiles();
+                updateFileLabel();
+                renderFileList();
+            });
+            fileList.appendChild(item);
+        });
+    };
 
     const openModal = () => {
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
+        if (newFields) newFields.classList.add('is-hidden');
+        if (selectEl) selectEl.value = '';
     };
     const closeModal = () => {
         modal.classList.remove('open');
@@ -368,12 +423,47 @@ function setupUpload() {
         if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
     });
 
+    statusOk.addEventListener('click', () => {
+        statusModal.classList.remove('open');
+        statusModal.setAttribute('aria-hidden', 'true');
+    });
+    statusModal.addEventListener('click', e => {
+        if (e.target === statusModal) {
+            statusModal.classList.remove('open');
+            statusModal.setAttribute('aria-hidden', 'true');
+        }
+    });
+
+    if (selectEl && newFields) {
+        selectEl.addEventListener('change', () => {
+            const wantsNew = selectEl.value === '__new__';
+            newFields.classList.toggle('is-hidden', !wantsNew);
+            if (!wantsNew && newEl) newEl.value = '';
+        });
+    }
+
     const updateFileLabel = () => {
-        const files = fileInput.files ? Array.from(fileInput.files) : [];
-        fileName.textContent = files.length ? files.map(f => f.name).join(', ') : 'No files selected';
+        fileName.textContent = selectedFiles.length ? `${selectedFiles.length} file(s) selected` : 'No files selected';
     };
 
-    fileInput.addEventListener('change', updateFileLabel);
+    const mergeFiles = (incoming) => {
+        const seen = new Set(selectedFiles.map(f => `${f.name}:${f.size}:${f.lastModified}`));
+        incoming.forEach(file => {
+            const key = `${file.name}:${file.size}:${file.lastModified}`;
+            if (!seen.has(key)) {
+                selectedFiles.push(file);
+                seen.add(key);
+            }
+        });
+        syncInputFiles();
+        updateFileLabel();
+        renderFileList();
+    };
+
+    fileInput.addEventListener('change', () => {
+        const incoming = fileInput.files ? Array.from(fileInput.files) : [];
+        mergeFiles(incoming);
+    });
 
     drop.addEventListener('dragover', e => {
         e.preventDefault();
@@ -384,34 +474,43 @@ function setupUpload() {
         e.preventDefault();
         drop.classList.remove('dragging');
         if (!e.dataTransfer || !e.dataTransfer.files) return;
-        fileInput.files = e.dataTransfer.files;
-        updateFileLabel();
+        mergeFiles(Array.from(e.dataTransfer.files));
     });
 
     form.addEventListener('submit', async e => {
         e.preventDefault();
-        const files = fileInput.files ? Array.from(fileInput.files) : [];
-        const newCategory = newEl && newEl.value ? newEl.value.trim() : '';
+        const files = selectedFiles;
         const selectedCategory = selectEl ? selectEl.value : '';
-        const category = newCategory || selectedCategory;
+        const wantsNew = selectedCategory === '__new__';
+        const newCategory = wantsNew && newEl && newEl.value ? newEl.value.trim() : '';
+        const category = wantsNew ? newCategory : selectedCategory;
 
         if (!files.length) {
             setUploadStatus('Select a file first.', true);
             return;
         }
+        if (wantsNew && !category) {
+            setUploadStatus('Enter a new category name.', true);
+            return;
+        }
 
-        setUploadStatus('Uploading...');
+        setUploadLoading(true);
         try {
             for (const file of files) {
                 await uploadAudio(file, category);
             }
-            setUploadStatus('Upload complete.');
-            fileInput.value = '';
-            if (newEl) newEl.value = '';
-            updateFileLabel();
             closeModal();
+            setUploadLoading(false);
+            setUploadStatus('Your songs are ready.');
+            fileInput.value = '';
+            selectedFiles = [];
+            if (newEl) newEl.value = '';
+            if (newFields) newFields.classList.add('is-hidden');
+            updateFileLabel();
+            renderFileList();
             await refreshAudioList();
         } catch (err) {
+            setUploadLoading(false);
             setUploadStatus(err.error || 'Upload failed.', true);
         }
     });

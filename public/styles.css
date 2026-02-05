@@ -407,11 +407,6 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     gap: 12px;
 }
 
-.upload-status {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-
 .ctrl-upload {
     border-radius: 12px;
     padding: 8px 14px;
@@ -440,6 +435,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     border-radius: 18px;
     padding: 18px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
 }
 
 .upload-head {
@@ -469,6 +465,35 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .upload-form {
     display: grid;
     gap: 16px;
+}
+
+.upload-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 8, 14, 0.8);
+    border-radius: 18px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 2;
+}
+
+.upload-loading.show {
+    display: flex;
+}
+
+.upload-ouroboros {
+    width: 90px;
+    height: 90px;
+    animation: spin 2.6s linear infinite;
+    filter: drop-shadow(0 0 12px var(--gold-glow));
+}
+
+.upload-loading p {
+    color: var(--gold-light);
+    font-family: 'Cinzel', serif;
 }
 
 .upload-drop {
@@ -511,6 +536,55 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     font-size: 0.85rem;
 }
 
+.upload-file-list {
+    display: grid;
+    gap: 8px;
+}
+
+.upload-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-glass);
+    background: rgba(0,0,0,0.2);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.upload-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-file-remove {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.35);
+    color: #fca5a5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.upload-file-remove svg {
+    width: 14px;
+    height: 14px;
+}
+
+.upload-file-remove:hover {
+    background: rgba(220,50,50,0.35);
+    box-shadow: 0 0 10px rgba(220,50,50,0.35);
+    transform: translateY(-1px);
+}
+
 .upload-fields {
     display: grid;
     gap: 8px;
@@ -538,9 +612,57 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     color: var(--text-muted);
 }
 
+.new-category-fields {
+    display: grid;
+    gap: 8px;
+}
+
 .upload-actions {
     display: flex;
     justify-content: flex-end;
+}
+
+.status-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 8, 14, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.status-modal.open {
+    display: flex;
+}
+
+.status-panel {
+    width: min(440px, 90vw);
+    background: rgba(20, 15, 28, 0.98);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    text-align: center;
+}
+
+.status-panel h2 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+}
+
+.status-panel p {
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.status-actions {
+    display: flex;
+    justify-content: center;
 }
 
 .soundboard {

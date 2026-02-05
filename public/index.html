@@ -114,9 +114,7 @@
             </div>
             <button id="openUpload" class="ctrl-btn ctrl-upload">Add Song</button>
         </div>
-        <div class="upload-bar">
-            <span id="uploadStatus" class="upload-status" aria-live="polite"></span>
-        </div>
+        <div class="upload-bar"></div>
         <div id="audioButtons"></div>
     </main>
 
@@ -126,29 +124,47 @@
                 <h2 id="uploadTitle">Add Songs</h2>
                 <button id="closeUpload" class="upload-close" type="button" aria-label="Close upload">×</button>
             </div>
+            <div id="uploadLoading" class="upload-loading" aria-hidden="true">
+                <img class="upload-ouroboros" src="/ouroboros.svg" alt="Uploading">
+                <p>Uploading...</p>
+            </div>
 
             <form id="uploadForm" class="upload-form">
                 <input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden>
                 <label id="uploadDrop" class="upload-drop" for="uploadFile">
-                    <span class="drop-title">Drag a song here</span>
+                    <span class="drop-title">Drag your song(s) here</span>
                     <span class="drop-sub">or <span class="drop-link">browse</span> your files</span>
                     <span id="uploadFileName" class="drop-file">No files selected</span>
                 </label>
+                <div id="uploadFileList" class="upload-file-list" aria-live="polite"></div>
 
                 <div class="upload-fields">
                     <label class="field-label" for="uploadCategorySelect">Category</label>
                     <select id="uploadCategorySelect" class="field-select">
                         <option value="">Root (no category)</option>
+                        <option value="__new__">New category...</option>
                     </select>
 
-                    <label class="field-label" for="uploadCategoryNew">Or create new</label>
-                    <input id="uploadCategoryNew" class="field-input" placeholder="New category name">
+                    <div id="newCategoryFields" class="new-category-fields is-hidden">
+                        <label class="field-label" for="uploadCategoryNew">New category name</label>
+                        <input id="uploadCategoryNew" class="field-input" placeholder="New category name">
+                    </div>
                 </div>
 
                 <div class="upload-actions">
                     <button type="submit" class="ctrl-btn ctrl-upload">Upload</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="statusModal" class="status-modal" aria-hidden="true">
+        <div class="status-panel" role="dialog" aria-modal="true" aria-labelledby="statusTitle">
+            <h2 id="statusTitle">Upload complete</h2>
+            <p id="statusMessage">Your songs are ready.</p>
+            <div class="status-actions">
+                <button id="statusOk" class="ctrl-btn ctrl-upload" type="button">Ok</button>
+            </div>
         </div>
     </div>
 

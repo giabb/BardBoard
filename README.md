@@ -93,7 +93,10 @@ You should see the BardBoard interface. If your voice channel ID is set correctl
 
 ## 🎵 Adding Your Sounds
 
-BardBoard reads audio files from the `audio-files` folder inside the project directory. Just drop your files in there, and they will appear on the soundboard after a browser refresh.
+You can add sounds in two ways:
+
+- **In-browser upload:** Click **Add Song**, drag & drop files (or browse), pick a category or create a new one, then upload.
+- **Manual:** Drop audio files into the `audio-files` folder inside the project directory. Refresh the page to see them.
 
 **Supported formats:** MP3, WAV, OGG, M4A
 
@@ -117,6 +120,7 @@ audio-files/
 This would give you a soundboard with a few loose sounds at the top, then a **Combat** section, then an **NPCs** section — each with their own buttons.
 
 The categories can be collapsed and expanded, and each category has its own colour!
+You can also delete songs or entire categories directly from the web UI (with a confirmation prompt).
 
 ---
 
@@ -142,6 +146,10 @@ Right below the controls you'll see a strip that shows you what's playing right 
 ### Search Bar
 
 Below the playing bar, you can find a search bar. This bar filters songs and categories.
+
+### Add Song (Upload)
+
+Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one).
 
 ### Using It on Mobile
 
@@ -179,7 +187,6 @@ Here's what's on the horizon for BardBoard:
 - [ ] 🎶 **Playlist mode** — Queue up multiple sounds and let them play one after another
 - [ ] 💬 **Discord slash commands** — Play sounds with `/play` directly in chat, in addition to the web UI
 - [ ] 🌐 **Multi-channel support** — Run separate soundboards for different voice channels at the same time
-- [ ] 📤 **In-browser uploads** — Add sounds by dragging and dropping files right onto the web UI
 - [ ] ✨ **Make things simpler** — I know the whole setup can be a lot for most of the users, so I hope to make things easier in the future! 
 
 ---
