@@ -27,6 +27,5 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - CHANNEL_ID=${CHANNEL_ID}
       - BOT_PORT=${BOT_PORT}
-    volumes: # comment this property if ext volumes not needed
-      - ./public:/usr/src/app/public
+    volumes:
       - ./audio-files:/usr/src/app/audio-files

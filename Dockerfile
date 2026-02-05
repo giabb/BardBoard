@@ -30,9 +30,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY BardBoard.js ./
-
-# Uncomment these 2 lines if ext volumes not needed
-#COPY public/ ./public/
-#COPY audio-files/ ./audio-files/
+COPY server/ ./server/
+COPY public/ ./public/
 
 CMD ["node", "BardBoard.js"]

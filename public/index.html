@@ -61,14 +61,14 @@
                     <input id="volumeSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Volume">
                 </div>
 
-                <button id="pauseToggle" class="ctrl-btn ctrl-pause" onclick="handlePauseToggle()" aria-label="Pause/Resume">
+                <button id="pauseToggle" class="ctrl-btn ctrl-pause" aria-label="Pause/Resume">
                     <svg id="pauseIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>
                     </svg>
                     <span>Pause</span>
                 </button>
 
-                <button id="repeatToggle" class="ctrl-btn ctrl-repeat" onclick="handleRepeatToggle()" aria-label="Toggle repeat">
+                <button id="repeatToggle" class="ctrl-btn ctrl-repeat" aria-label="Toggle repeat">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 014-4h14"></path>
                         <path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 01-4 4H3"></path>
@@ -174,6 +174,6 @@
     </footer>
 
 <!-- ──────────────── Scripts ──────────────── -->
-<script src="/app.js" defer></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>
