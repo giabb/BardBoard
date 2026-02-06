@@ -338,6 +338,17 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     padding: 36px 24px 48px;
 }
 
+.soundboard-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.soundboard-main {
+    flex: 1;
+    min-width: 0;
+}
+
 .search-bar {
     margin-bottom: 22px;
     display: flex;
@@ -346,6 +357,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 .search-field {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -402,7 +414,10 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
    PLAYLIST PANEL
    ============================================= */
 .playlist-panel {
-    margin: 0 0 26px;
+    width: min(320px, 32vw);
+    position: sticky;
+    top: 24px;
+    align-self: flex-start;
     padding: 16px 18px;
     border-radius: var(--radius-card);
     border: 1px solid var(--border-glass);
@@ -1086,7 +1101,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     box-shadow: 0 0 18px color-mix(in srgb, var(--cat-color, var(--gold)) 35%, transparent), 0 4px 16px rgba(0,0,0,0.3);
 }
 
-.soundboard > .track-grid:first-child { margin-top: 0; }
+#audioButtons > .track-grid:first-child { margin-top: 0; }
 
 /* =============================================
    FOOTER
@@ -1291,6 +1306,11 @@ body.login-page {
     .track-grid   { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
     .track-btn    { padding: 22px 8px 18px; }
     .soundboard   { padding: 24px 16px 40px; }
+    .soundboard-layout { flex-direction: column; }
+    .playlist-panel {
+        position: static;
+        width: 100%;
+    }
 }
 
 @media (max-width: 400px) {

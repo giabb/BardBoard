@@ -34,9 +34,7 @@ function createDiscordAudioService(discordClient) {
   const trackDurations = new Map();
   const pausedState = new Map();
   const pausedElapsed = new Map();
-  const queueBySession = new Map();
-  const activeQueueOwner = new Map();
-  const activeChannelId = new Map();
+  const queueByGuild = new Map();
 
   function getChannel(channelId) {
     return discordClient.channels.cache.get(channelId);
@@ -71,45 +69,51 @@ function createDiscordAudioService(discordClient) {
     }
   }
 
-  function getQueue(sessionId) {
-    if (!queueBySession.has(sessionId)) {
-      queueBySession.set(sessionId, []);
-    }
-    return queueBySession.get(sessionId);
+  function getGuildId(channelId) {
+    const channel = getChannel(channelId);
+    if (!channel) return null;
+    return channel.guild.id;
   }
 
-  function addToQueue(sessionId, fileName) {
-    const queue = getQueue(sessionId);
+  function getQueue(channelId) {
+    const guildId = getGuildId(channelId);
+    if (!guildId) return null;
+    if (!queueByGuild.has(guildId)) {
+      queueByGuild.set(guildId, []);
+    }
+    return queueByGuild.get(guildId);
+  }
+
+  function addToQueue(channelId, fileName) {
+    const queue = getQueue(channelId);
+    if (!queue) return null;
     queue.push(fileName);
     return queue;
   }
 
-  function setQueue(sessionId, queue) {
+  function setQueue(channelId, queue) {
+    const guildId = getGuildId(channelId);
+    if (!guildId) return null;
     const safeQueue = Array.isArray(queue) ? queue.slice() : [];
-    queueBySession.set(sessionId, safeQueue);
+    queueByGuild.set(guildId, safeQueue);
     return safeQueue;
   }
 
-  function clearQueue(sessionId) {
-    queueBySession.set(sessionId, []);
+  function clearQueue(channelId) {
+    const guildId = getGuildId(channelId);
+    if (!guildId) return null;
+    queueByGuild.set(guildId, []);
     return [];
   }
 
-  function shuffleQueue(sessionId) {
-    const queue = getQueue(sessionId);
+  function shuffleQueue(channelId) {
+    const queue = getQueue(channelId);
+    if (!queue) return null;
     for (let i = queue.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [queue[i], queue[j]] = [queue[j], queue[i]];
     }
     return queue;
-  }
-
-  function setActiveQueueOwner(channelId, sessionId) {
-    const channel = getChannel(channelId);
-    if (!channel) return false;
-    activeQueueOwner.set(channel.guild.id, sessionId);
-    activeChannelId.set(channel.guild.id, channelId);
-    return true;
   }
 
   function isPlaying(channelId) {
@@ -120,8 +124,9 @@ function createDiscordAudioService(discordClient) {
     return Boolean(player && currentAudioFile.get(guildId));
   }
 
-  async function playNextFromQueue(channelId, sessionId) {
-    const queue = getQueue(sessionId);
+  async function playNextFromQueue(channelId) {
+    const queue = getQueue(channelId);
+    if (!queue) return false;
     while (queue.length > 0) {
       const next = queue.shift();
       const ok = await playAudioInDiscord(next, channelId);
@@ -139,8 +144,6 @@ function createDiscordAudioService(discordClient) {
     if (!safePath) return false;
 
     try {
-      activeChannelId.set(channel.guild.id, channelId);
-
       const existingPlayer = activeAudioPlayers.get(channel.guild.id);
       if (existingPlayer) {
         existingPlayer.stop();
@@ -203,13 +206,8 @@ function createDiscordAudioService(discordClient) {
               player.play(newResource);
             }
           } else {
-            const owner = activeQueueOwner.get(channel.guild.id);
-            const resumeChannelId = activeChannelId.get(channel.guild.id);
-            if (owner && resumeChannelId) {
-              const ok = await playNextFromQueue(resumeChannelId, owner);
-              if (ok) return;
-              activeQueueOwner.delete(channel.guild.id);
-            }
+            const ok = await playNextFromQueue(channel.id);
+            if (ok) return;
             cleanupPlayerOnly(channel.guild.id);
           }
         }
@@ -396,7 +394,6 @@ function createDiscordAudioService(discordClient) {
   return {
     playAudioInDiscord,
     playNextFromQueue,
-    setActiveQueueOwner,
     getQueue,
     addToQueue,
     setQueue,

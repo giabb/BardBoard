@@ -45,18 +45,26 @@ function createPlaylistRoutes(audioService) {
   router.use(limiter);
 
   router.get('/playlist', (req, res) => {
-    const queue = audioService.getQueue(req.sessionID);
+    const { channelId } = req.query;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const queue = audioService.getQueue(channelId);
+    if (!queue) return res.status(404).json({ error: 'Channel not found' });
     res.json({ queue });
   });
 
   router.post('/playlist/add', (req, res) => {
+    const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const safeFile = normalizeFileName(req.body.fileName);
     if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
-    const queue = audioService.addToQueue(req.sessionID, safeFile);
+    const queue = audioService.addToQueue(channelId, safeFile);
+    if (!queue) return res.status(404).json({ error: 'Channel not found' });
     res.json({ queue });
   });
 
   router.post('/playlist/set', (req, res) => {
+    const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const rawQueue = req.body.queue;
     if (!Array.isArray(rawQueue)) return res.status(400).json({ error: 'Invalid queue' });
     const safeQueue = [];
@@ -65,46 +73,47 @@ function createPlaylistRoutes(audioService) {
       if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
       safeQueue.push(safeFile);
     }
-    const queue = audioService.setQueue(req.sessionID, safeQueue);
+    const queue = audioService.setQueue(channelId, safeQueue);
+    if (!queue) return res.status(404).json({ error: 'Channel not found' });
     res.json({ queue });
   });
 
   router.post('/playlist/shuffle', (req, res) => {
-    const queue = audioService.shuffleQueue(req.sessionID);
+    const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const queue = audioService.shuffleQueue(channelId);
+    if (!queue) return res.status(404).json({ error: 'Channel not found' });
     res.json({ queue });
   });
 
   router.post('/playlist/clear', (req, res) => {
-    const queue = audioService.clearQueue(req.sessionID);
+    const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const queue = audioService.clearQueue(channelId);
+    if (!queue) return res.status(404).json({ error: 'Channel not found' });
     res.json({ queue });
   });
 
   router.post('/playlist/play', async (req, res) => {
     const { channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
-    if (!audioService.setActiveQueueOwner(channelId, req.sessionID)) {
-      return res.status(404).json({ error: 'Channel not found' });
-    }
     if (audioService.isPlaying(channelId)) {
-      return res.json({ started: false, queue: audioService.getQueue(req.sessionID) });
+      return res.json({ started: false, queue: audioService.getQueue(channelId) });
     }
-    const started = await audioService.playNextFromQueue(channelId, req.sessionID);
+    const started = await audioService.playNextFromQueue(channelId);
     if (!started) return res.status(404).json({ error: 'Queue empty' });
-    return res.json({ started: true, queue: audioService.getQueue(req.sessionID) });
+    return res.json({ started: true, queue: audioService.getQueue(channelId) });
   });
 
   router.post('/playlist/skip', async (req, res) => {
     const { channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
-    if (!audioService.setActiveQueueOwner(channelId, req.sessionID)) {
-      return res.status(404).json({ error: 'Channel not found' });
-    }
-    const started = await audioService.playNextFromQueue(channelId, req.sessionID);
+    const started = await audioService.playNextFromQueue(channelId);
     if (!started) {
       audioService.stopAudioInDiscord(channelId);
-      return res.json({ started: false, queue: audioService.getQueue(req.sessionID) });
+      return res.json({ started: false, queue: audioService.getQueue(channelId) });
     }
-    return res.json({ started: true, queue: audioService.getQueue(req.sessionID) });
+    return res.json({ started: true, queue: audioService.getQueue(channelId) });
   });
 
   return router;

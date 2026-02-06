@@ -115,23 +115,27 @@
             <button id="openUpload" class="ctrl-btn ctrl-upload">Add Song</button>
         </div>
         <div class="upload-bar"></div>
-        <section class="playlist-panel" aria-label="Playlist queue">
-            <div class="playlist-head">
-                <div>
-                    <h2 class="playlist-heading">Playlist</h2>
-                    <p class="playlist-sub">Up next for your session.</p>
+        <div class="soundboard-layout">
+            <section class="soundboard-main">
+                <div id="audioButtons"></div>
+            </section>
+            <aside class="playlist-panel" aria-label="Playlist queue">
+                <div class="playlist-head">
+                    <div>
+                        <h2 class="playlist-heading">Playlist</h2>
+                        <p class="playlist-sub">Up next for this guild.</p>
+                    </div>
+                    <div class="playlist-actions">
+                        <button id="playlistPlay" class="ctrl-btn ctrl-playlist" type="button">Play Queue</button>
+                        <button id="playlistSkip" class="ctrl-btn ctrl-playlist" type="button">Skip</button>
+                        <button id="playlistShuffle" class="ctrl-btn ctrl-playlist" type="button">Shuffle</button>
+                        <button id="playlistClear" class="ctrl-btn ctrl-playlist" type="button">Clear</button>
+                    </div>
                 </div>
-                <div class="playlist-actions">
-                    <button id="playlistPlay" class="ctrl-btn ctrl-playlist" type="button">Play Queue</button>
-                    <button id="playlistSkip" class="ctrl-btn ctrl-playlist" type="button">Skip</button>
-                    <button id="playlistShuffle" class="ctrl-btn ctrl-playlist" type="button">Shuffle</button>
-                    <button id="playlistClear" class="ctrl-btn ctrl-playlist" type="button">Clear</button>
-                </div>
-            </div>
-            <div id="playlistEmpty" class="playlist-empty">No tracks queued yet.</div>
-            <ul id="playlistList" class="playlist-list" aria-live="polite"></ul>
-        </section>
-        <div id="audioButtons"></div>
+                <div id="playlistEmpty" class="playlist-empty">No tracks queued yet.</div>
+                <ul id="playlistList" class="playlist-list" aria-live="polite"></ul>
+            </aside>
+        </div>
     </main>
 
     <div id="uploadModal" class="upload-modal" aria-hidden="true">

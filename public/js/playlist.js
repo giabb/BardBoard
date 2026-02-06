@@ -33,6 +33,7 @@ let playBtn;
 let shuffleBtn;
 let clearBtn;
 let skipBtn;
+let isPlaying = false;
 
 function formatTrackLabel(file) {
     return file
@@ -42,7 +43,10 @@ function formatTrackLabel(file) {
 
 function setButtonsState() {
     const hasItems = queue.length > 0;
-    if (playBtn) playBtn.disabled = !hasItems;
+    if (playBtn) {
+        playBtn.classList.toggle('is-hidden', isPlaying || !hasItems);
+        playBtn.disabled = !hasItems;
+    }
     if (shuffleBtn) shuffleBtn.disabled = !hasItems;
     if (clearBtn) clearBtn.disabled = !hasItems;
     if (skipBtn) skipBtn.disabled = !hasItems;
@@ -156,6 +160,15 @@ export async function queueTrack(fileName) {
     } catch (err) {
         console.error('playlist add error:', err);
     }
+}
+
+export function refreshPlaylist() {
+    return refreshQueue();
+}
+
+export function setPlaylistPlaybackStatus(playing) {
+    isPlaying = Boolean(playing);
+    setButtonsState();
 }
 
 export function initPlaylist() {

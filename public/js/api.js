@@ -115,14 +115,14 @@ export function deleteCategory(name) {
 }
 
 export function fetchPlaylist() {
-    return fetch('/playlist');
+    return fetch('/playlist?channelId=' + encodeURIComponent(window.ENV.channelId));
 }
 
 export function addToPlaylist(fileName) {
     return fetch('/playlist/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName })
+        body: JSON.stringify({ fileName, channelId: window.ENV.channelId })
     });
 }
 
@@ -130,19 +130,23 @@ export function setPlaylist(queue) {
     return fetch('/playlist/set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queue })
+        body: JSON.stringify({ queue, channelId: window.ENV.channelId })
     });
 }
 
 export function shufflePlaylist() {
     return fetch('/playlist/shuffle', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
     });
 }
 
 export function clearPlaylist() {
     return fetch('/playlist/clear', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
     });
 }
 

@@ -16,6 +16,7 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import { getNowPlaying, seekTo } from './api.js';
+import { refreshPlaylist, setPlaylistPlaybackStatus } from './playlist.js';
 import { playbackState } from './state.js';
 import { updatePauseUI } from './controls.js';
 
@@ -43,6 +44,7 @@ export function updateNowPlaying() {
     return getNowPlaying()
         .then(r => r.json())
         .then(data => {
+            const previousSong = playbackState.npState.song;
             const songEl = document.getElementById('nowPlayingSong');
             const barEl = document.getElementById('nowPlayingBar');
             const progRow = document.getElementById('npProgressRow');
@@ -53,6 +55,7 @@ export function updateNowPlaying() {
             playbackState.npPollTime = performance.now();
             playbackState.isPaused = data.paused || false;
             updatePauseUI(playbackState.isPaused);
+            setPlaylistPlaybackStatus(Boolean(data.song));
 
             if (data.song) {
                 songEl.textContent = data.song;
@@ -69,6 +72,10 @@ export function updateNowPlaying() {
                 barEl.classList.remove('has-song');
                 progRow.classList.remove('visible');
                 playbackState.npState = { song: null, elapsed: 0, duration: 0 };
+            }
+
+            if (data.song !== previousSong) {
+                void refreshPlaylist();
             }
         })
         .catch(err => console.error('now-playing poll error:', err));
