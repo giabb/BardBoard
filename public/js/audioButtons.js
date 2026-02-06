@@ -16,6 +16,7 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import { fetchAudioFiles, deleteAudioFile, deleteCategory, playAudio } from './api.js';
+import { queueTrack } from './playlist.js';
 
 let confirmDialog;
 let confirmResolver = null;
@@ -117,6 +118,12 @@ export async function loadAudioButtons(onRefresh = () => {}) {
             btn.innerHTML = `
                 <span class="track-label">${displayName}</span>
                 <div class="track-actions">
+                    <button class="track-queue" type="button" aria-label="Add ${displayName} to playlist">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 5v14"></path>
+                            <path d="M5 12h14"></path>
+                        </svg>
+                    </button>
                     <button class="track-delete" type="button" aria-label="Delete ${displayName}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <polyline points="3 6 5 6 21 6"></polyline>
@@ -133,6 +140,12 @@ export async function loadAudioButtons(onRefresh = () => {}) {
                 playAudio(file);
                 btn.classList.add('pressed');
                 setTimeout(() => btn.classList.remove('pressed'), 200);
+            });
+
+            const queueBtn = btn.querySelector('.track-queue');
+            queueBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                void queueTrack(file);
             });
 
             const delBtn = btn.querySelector('.track-delete');

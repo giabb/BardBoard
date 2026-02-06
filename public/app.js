@@ -22,6 +22,7 @@ import { applySearchFilter, setupSearch } from './js/search.js';
 import { setupUpload } from './js/upload.js';
 import { initControls, syncPauseState, syncRepeatState, syncVolumeState } from './js/controls.js';
 import { updateNowPlaying, startNowPlayingTicker, setupSeek } from './js/nowPlaying.js';
+import { initPlaylist } from './js/playlist.js';
 
 const DEBUG_LOADER_MS = 0;
 
@@ -39,6 +40,7 @@ async function initApp() {
         setupSearch();
         setupUpload(refreshAudioList);
         initControls();
+        initPlaylist();
         setupSeek();
         startNowPlayingTicker();
         await Promise.all([

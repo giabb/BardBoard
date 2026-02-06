@@ -25,6 +25,7 @@ const FileStore = require('session-file-store')(session);
 const fs = require('fs');
 const { createDiscordAudioService } = require('./services/discordAudio');
 const createAudioRoutes = require('./routes/audio');
+const createPlaylistRoutes = require('./routes/playlist');
 const fileRoutes = require('./routes/files');
 
 require('dotenv').config();
@@ -146,6 +147,7 @@ app.get('/env-config', (req, res) => {
 });
 
 app.use(createAudioRoutes(audioService));
+app.use(createPlaylistRoutes(audioService));
 app.use(fileRoutes);
 
 discordClient.on(Events.ClientReady, () => {

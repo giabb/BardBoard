@@ -113,3 +113,51 @@ export function deleteCategory(name) {
         method: 'DELETE'
     });
 }
+
+export function fetchPlaylist() {
+    return fetch('/playlist');
+}
+
+export function addToPlaylist(fileName) {
+    return fetch('/playlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName })
+    });
+}
+
+export function setPlaylist(queue) {
+    return fetch('/playlist/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue })
+    });
+}
+
+export function shufflePlaylist() {
+    return fetch('/playlist/shuffle', {
+        method: 'POST'
+    });
+}
+
+export function clearPlaylist() {
+    return fetch('/playlist/clear', {
+        method: 'POST'
+    });
+}
+
+export function playPlaylist() {
+    return fetch('/playlist/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
+    });
+}
+
+export function skipPlaylist() {
+    return fetch('/playlist/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: window.ENV.channelId })
+    });
+}
