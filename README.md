@@ -82,6 +82,7 @@ That's it. No coding required.
 4. (Optional) Enable the login screen by setting:
    - `AUTH_USER` / `AUTH_PASS` for the credentials
    - `SESSION_SECRET` to a long random string (32+ chars)
+   - `SESSION_DIR` (optional) if you want to store sessions outside the container (Docker mounts `./sessions`)
 
 ### Step 5 — Start It Up
 

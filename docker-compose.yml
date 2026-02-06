@@ -27,3 +27,4 @@ services:
       - .env
     volumes:
       - ./audio-files:/usr/src/app/audio-files
+      - ${SESSION_DIR:-./sessions}:/usr/src/app/sessions

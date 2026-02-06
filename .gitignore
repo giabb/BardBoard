@@ -26,6 +26,9 @@ web_modules/
 .env.production.local
 .env.local
 
+# Session files
+sessions/
+
 # Other Node related
 .npm
 .eslintcache

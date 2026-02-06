@@ -21,6 +21,8 @@ const { Events, Client, GatewayIntentBits } = require('discord.js');
 const helmet = require('helmet');
 const cors = require('cors');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
+const fs = require('fs');
 const { createDiscordAudioService } = require('./services/discordAudio');
 const createAudioRoutes = require('./routes/audio');
 const fileRoutes = require('./routes/files');
@@ -46,6 +48,29 @@ const corsOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+const sessionDir = process.env.SESSION_DIR || path.join(__dirname, '..', 'sessions');
+
+function cleanupNonRememberSessions() {
+  try {
+    if (!fs.existsSync(sessionDir)) return;
+    const files = fs.readdirSync(sessionDir);
+    files.forEach(file => {
+      if (!file.endsWith('.json')) return;
+      const fullPath = path.join(sessionDir, file);
+      try {
+        const raw = fs.readFileSync(fullPath, 'utf8');
+        const data = JSON.parse(raw);
+        if (!data || !data.remember) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch (err) {
+        fs.unlinkSync(fullPath);
+      }
+    });
+  } catch (err) {
+    console.warn('Session cleanup skipped:', err.message);
+  }
+}
 
 app.use(helmet({ contentSecurityPolicy: false }));
 if (corsOrigins.length > 0) {
@@ -57,10 +82,15 @@ if (corsOrigins.length > 0) {
     credentials: true
   }));
 }
+cleanupNonRememberSessions();
 app.use(session({
   secret: process.env.SESSION_SECRET || 'change-me',
   resave: false,
   saveUninitialized: false,
+  store: new FileStore({
+    path: sessionDir,
+    retries: 1
+  }),
   cookie: {
     httpOnly: true,
     sameSite: 'lax'
@@ -83,6 +113,7 @@ app.post('/login', (req, res) => {
   }
 
   req.session.authenticated = true;
+  req.session.remember = Boolean(req.body.remember);
   if (req.body.remember) {
     req.session.cookie.maxAge = rememberDays * 24 * 60 * 60 * 1000;
   }
