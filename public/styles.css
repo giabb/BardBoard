@@ -658,6 +658,61 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 /* =============================================
+   CONFIRM MODAL
+   ============================================= */
+.confirm-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 8, 14, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.confirm-modal.open { display: flex; }
+
+.confirm-panel {
+    width: min(440px, 90vw);
+    background: rgba(20, 15, 28, 0.98);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    text-align: center;
+}
+
+.confirm-panel h2 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+}
+
+.confirm-panel p {
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.confirm-danger {
+    background: linear-gradient(135deg, rgba(220,50,50,0.5), rgba(200,35,35,0.35));
+    border-color: rgba(240,80,80,0.45);
+    color: #f6b1b1;
+}
+
+.confirm-danger:hover {
+    box-shadow: 0 0 14px rgba(220,50,50,0.3);
+}
+
+/* =============================================
    TRACK GRID
    ============================================= */
 .track-grid {

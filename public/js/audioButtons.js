@@ -17,7 +17,54 @@
 */
 import { fetchAudioFiles, deleteAudioFile, deleteCategory, playAudio } from './api.js';
 
+let confirmDialog;
+let confirmResolver = null;
+
+function getConfirmDialog() {
+    if (confirmDialog) return confirmDialog;
+
+    const modal = document.getElementById('confirmModal');
+    const message = document.getElementById('confirmMessage');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    const title = document.getElementById('confirmTitle');
+
+    if (!modal || !message || !okBtn || !cancelBtn || !title) {
+        confirmDialog = async () => true;
+        return confirmDialog;
+    }
+
+    const close = (result) => {
+        if (!confirmResolver) return;
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        confirmResolver(result);
+        confirmResolver = null;
+    };
+
+    okBtn.addEventListener('click', () => close(true));
+    cancelBtn.addEventListener('click', () => close(false));
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) close(false);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') close(false);
+    });
+
+    confirmDialog = (text, heading = 'Confirm delete') => new Promise(resolve => {
+        confirmResolver = resolve;
+        title.textContent = heading;
+        message.textContent = text;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        okBtn.focus();
+    });
+
+    return confirmDialog;
+}
+
 export async function loadAudioButtons(onRefresh = () => {}) {
+    const confirmDialog = getConfirmDialog();
     const data = await fetchAudioFiles();
     const container = document.getElementById('audioButtons');
     container.innerHTML = '';
@@ -91,8 +138,10 @@ export async function loadAudioButtons(onRefresh = () => {}) {
             const delBtn = btn.querySelector('.track-delete');
             delBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                if (!confirm(`Delete "${displayName}"?`)) return;
-                void deleteAudioFile(file).then(() => onRefresh());
+                void confirmDialog(`Delete "${displayName}"?`).then(confirmed => {
+                    if (!confirmed) return;
+                    void deleteAudioFile(file).then(() => onRefresh());
+                });
             });
 
             grid.appendChild(btn);
@@ -163,8 +212,10 @@ export async function loadAudioButtons(onRefresh = () => {}) {
             const catDeleteBtn = header.querySelector('.cat-delete');
             catDeleteBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                if (!confirm(`Delete category "${folderName}" and all its tracks?`)) return;
-                void deleteCategory(folderName).then(() => onRefresh());
+                void confirmDialog(`Delete category "${folderName}" and all its tracks?`).then(confirmed => {
+                    if (!confirmed) return;
+                    void deleteCategory(folderName).then(() => onRefresh());
+                });
             });
 
             container.appendChild(header);
