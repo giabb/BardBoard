@@ -241,7 +241,6 @@ If you want to tweak limits, auth, or run the UI from another host, these env va
 
 Here's what's on the horizon for BardBoard:
 
-- [ ] 🎶 **Playlist mode** — Queue up multiple sounds and let them play one after another
 - [ ] 💬 **Discord slash commands** — Play sounds with `/play` directly in chat, in addition to the web UI
 - [ ] 🌐 **Multi-channel support** — Run separate soundboards for different voice channels at the same time
 - [ ] ✨ **Make things simpler** — I know the whole setup can be a lot for most of the users, so I hope to make things easier in the future! 
