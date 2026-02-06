@@ -1,5 +1,5 @@
-<div style="text-align: center;">
-
+<div align="center">
+   
 # 🎵 BardBoard & Dragons 🐉
 
 **Your personal soundboard, right inside Discord.**
@@ -271,7 +271,7 @@ Even small improvements to the README or documentation are appreciated — just 
 
 ## 👥 Contributors
 
-<div style="text-align: center;">
+<div align="center">
 
 **Project Creator & Maintainer**
 
@@ -304,7 +304,7 @@ See the [LICENSE.md](LICENSE.md) file for complete details.
 
 ---
 
-<div style="text-align: center;">
+<div align="center">
 
 **Built for tabletop adventurers and Discord groups everywhere**
 
