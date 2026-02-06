@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 
 # 🎵 BardBoard & Dragons 🐉
 
@@ -6,7 +6,16 @@
 
 Play sound effects, ambient music, and voice lines directly into your voice channel — all from a single, clean web interface. Perfect for D&D sessions, watch parties, or anything in between.
 
-[![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)](LICENSE.md) [![Discord](https://img.shields.io/badge/Made%20for-Discord-5865F2.svg)](https://discord.com) [![Docker](https://img.shields.io/badge/Runs%20on-Docker-2496ED.svg)](https://docker.com)
+[![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)](LICENSE.md)
+[![Discord](https://img.shields.io/badge/Made%20for-Discord-5865F2.svg)](https://discord.com)
+[![Docker](https://img.shields.io/badge/Runs%20on-Docker-2496ED.svg)](https://docker.com)
+
+[![Release](https://img.shields.io/github/v/release/giabb/BardBoard)](https://github.com/giabb/BardBoard/releases)
+[![Node](https://img.shields.io/node/v/discord.js)](https://nodejs.org)
+<!--[![Stars](https://img.shields.io/github/stars/giabb/BardBoard?style=flat)](https://github.com/giabb/BardBoard/stargazers)
+[![Issues](https://img.shields.io/github/issues/giabb/BardBoard)](https://github.com/giabb/BardBoard/issues)
+[![Discussions](https://img.shields.io/github/discussions/giabb/BardBoard)](https://github.com/giabb/BardBoard/discussions)-->
+
 
 </div>
 
@@ -19,6 +28,7 @@ Play sound effects, ambient music, and voice lines directly into your voice chan
 - [🎵 Adding Your Sounds](#-adding-your-sounds)
 - [🎮 How to Use It](#-how-to-use-it)
 - [⚠️ Troubleshooting](#-troubleshooting)
+- [⚙️ Advanced Configuration](#-advanced-configuration)
 - [🗺️ What's Coming Next](#-whats-coming-next)
 - [🤝 Contributing](#-contributing)
 - [👥 Contributors](#-contributors)
@@ -84,7 +94,7 @@ That's it. No coding required.
    - `SESSION_SECRET` to a long random string (32+ chars)
    - `SESSION_DIR` (optional) if you want to store sessions outside the container (Docker mounts `./sessions`)
 
-### Step 5 — Start It Up
+### Step 5 — Start It Up (With Docker)
 
 1. Open a terminal (or PowerShell on Windows) in the BardBoard folder
 2. Run this single command: `docker compose up --build -d`
@@ -92,6 +102,16 @@ That's it. No coding required.
 4. Open your browser and go to **http://localhost:3000**
 
 You should see the BardBoard interface. If your voice channel ID is set correctly and the bot is in your server, you're all set! 🎉
+
+### Optional — Run Locally (without Docker)
+
+If you prefer running directly on your machine:
+
+1. Install Node.js (v18+ recommended) and make sure `ffmpeg` is in your PATH.
+2. Install dependencies: `npm install`
+3. Copy `.env.sample` to `.env` and fill in the required values.
+4. Start the app: `node BardBoard.js`
+5. Open **http://localhost:3000**
 
 ---
 
@@ -188,6 +208,35 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 
 ---
 
+## ⚙️ Advanced Configuration
+
+If you want to tweak limits, auth, or run the UI from another host, these env vars are available:
+
+**Core**
+- `BOT_PORT` (default `3000`) — Port for the web UI/API.
+- `DISCORD_TOKEN` — Your bot token (required).
+- `CHANNEL_ID` — Voice channel ID (required).
+
+**Auth & Sessions (optional)**
+- `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
+- `SESSION_SECRET` — Change this from the default `change-me` for security.
+- `SESSION_DIR` (default `./sessions`) — Where session files are stored (mounted in Docker).
+- `LOGIN_REMEMBER_DAYS` (default `30`) — "Remember me" cookie duration in days.
+
+**Uploads & Rate Limits**
+- `UPLOAD_MAX_MB` (default `50`) — Max size (MB) per uploaded file.
+- `RATE_LIMIT_AUDIO` (default `120`) — Requests per minute for audio actions.
+- `RATE_LIMIT_FILES` (default `60`) — Requests per minute for file actions.
+
+**CORS (when UI and API are on different hosts)**
+- `CORS_ORIGINS` — Comma-separated list of allowed origins (leave blank if UI + API are on the same host).
+
+**Local (non-Docker) run**
+- `ffmpeg` must be installed and available in your PATH for seek to work.
+- Audio dependencies like `libsodium` are required for Discord voice support.
+
+---
+
 ## 🗺️ What's Coming Next
 
 Here's what's on the horizon for BardBoard:
@@ -222,7 +271,7 @@ Even small improvements to the README or documentation are appreciated — just 
 
 ## 👥 Contributors
 
-<div align="center">
+<div style="text-align: center;">
 
 **Project Creator & Maintainer**
 
@@ -255,7 +304,7 @@ See the [LICENSE.md](LICENSE.md) file for complete details.
 
 ---
 
-<div align="center">
+<div style="text-align: center;">
 
 **Built for tabletop adventurers and Discord groups everywhere**
 
