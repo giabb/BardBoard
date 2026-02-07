@@ -141,7 +141,7 @@ function createDiscordAudioService(discordClient) {
   async function playNoiseOverCurrent(noiseFile, channel) {
     const guildId = channel.guild.id;
     const player = activeAudioPlayers.get(guildId);
-    const currentFile = currentAudioF<ile.get(guildId);
+    const currentFile = currentAudioFile.get(guildId);
     if (!player || !currentFile) return false;
 
     const noisePath = resolveAudioPath(noiseFile);
