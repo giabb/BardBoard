@@ -34,6 +34,7 @@ function createDiscordAudioService(discordClient) {
   const trackDurations = new Map();
   const pausedState = new Map();
   const pausedElapsed = new Map();
+  const playbackMode = new Map();
   const queueByGuild = new Map();
 
   function getChannel(channelId) {
@@ -50,6 +51,7 @@ function createDiscordAudioService(discordClient) {
       playStartTime.delete(guildId);
       pausedState.delete(guildId);
       pausedElapsed.delete(guildId);
+      playbackMode.delete(guildId);
     }
   }
 
@@ -116,6 +118,70 @@ function createDiscordAudioService(discordClient) {
     return queue;
   }
 
+  function getNoiseFolderName() {
+    const raw = process.env.NOISES_FOLDER || '!noises';
+    return raw.toString().trim().replace(/^\/+|\/+$/g, '') || '!noises';
+  }
+
+  function isNoiseTrack(fileName) {
+    const folder = getNoiseFolderName().toLowerCase();
+    const normalized = fileName.replace(/\\/g, '/').toLowerCase();
+    return normalized.startsWith(`${folder}/`);
+  }
+
+  function getElapsedSeconds(guildId) {
+    const isPaused = pausedState.get(guildId) || false;
+    if (isPaused) {
+      return pausedElapsed.get(guildId) || 0;
+    }
+    const startedAt = playStartTime.get(guildId) || Date.now();
+    return Math.max(0, (Date.now() - startedAt) / 1000);
+  }
+
+  async function playNoiseOverCurrent(noiseFile, channel) {
+    const guildId = channel.guild.id;
+    const player = activeAudioPlayers.get(guildId);
+    const currentFile = currentAudioF<ile.get(guildId);
+    if (!player || !currentFile) return false;
+
+    const noisePath = resolveAudioPath(noiseFile);
+    const mainPath = resolveAudioPath(currentFile);
+    if (!noisePath || !mainPath) return false;
+
+    const offsetSecs = getElapsedSeconds(guildId);
+    const ffmpeg = spawn('ffmpeg', [
+      '-ss', String(offsetSecs),
+      '-i', mainPath,
+      '-i', noisePath,
+      '-filter_complex', 'amix=inputs=2:duration=first:dropout_transition=0',
+      '-f', 's16le',
+      '-ar', '48000',
+      '-ac', '2',
+      'pipe:1'
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    ffmpeg.on('error', (err) => {
+      console.error('FFmpeg overlay error:', err);
+    });
+
+    const resource = createAudioResource(ffmpeg.stdout, {
+      inputType: StreamType.Raw,
+      inlineVolume: true,
+      metadata: { title: currentFile }
+    });
+
+    const volume = currentVolume.get(guildId) || 0.5;
+    resource.volume.setVolume(volume);
+
+    activeAudioResources.set(guildId, resource);
+    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
+    pausedState.set(guildId, false);
+    pausedElapsed.delete(guildId);
+
+    player.play(resource);
+    return true;
+  }
+
   function isPlaying(channelId) {
     const channel = getChannel(channelId);
     if (!channel) return false;
@@ -144,6 +210,12 @@ function createDiscordAudioService(discordClient) {
     if (!safePath) return false;
 
     try {
+      const isNoise = isNoiseTrack(fileName);
+      if (isNoise && currentAudioFile.get(channel.guild.id) && playbackMode.get(channel.guild.id) !== 'noise') {
+        const ok = await playNoiseOverCurrent(fileName, channel);
+        if (ok) return true;
+      }
+
       const existingPlayer = activeAudioPlayers.get(channel.guild.id);
       if (existingPlayer) {
         existingPlayer.stop();
@@ -175,6 +247,7 @@ function createDiscordAudioService(discordClient) {
       });
 
       currentAudioFile.set(channel.guild.id, fileName);
+      playbackMode.set(channel.guild.id, isNoise ? 'noise' : 'main');
 
       const resource = createAudioResource(safePath, { inlineVolume: true });
 
@@ -191,6 +264,11 @@ function createDiscordAudioService(discordClient) {
 
       player.on('stateChange', async (oldState, newState) => {
         if (newState.status === 'idle') {
+          const mode = playbackMode.get(channel.guild.id) || 'main';
+          if (mode === 'noise') {
+            cleanupPlayerOnly(channel.guild.id);
+            return;
+          }
           if (repeatEnabled.get(channel.guild.id)) {
             const currentFile = currentAudioFile.get(channel.guild.id);
             if (currentFile) {

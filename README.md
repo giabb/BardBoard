@@ -216,6 +216,7 @@ If you want to tweak limits, auth, or run the UI from another host, these env va
 - `BOT_PORT` (default `3000`) — Port for the web UI/API.
 - `DISCORD_TOKEN` — Your bot token (required).
 - `CHANNEL_ID` — Voice channel ID (required).
+- `NOISES_FOLDER` (default `!noises`) — Category folder name for overlay sounds.
 
 **Auth & Sessions (optional)**
 - `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
