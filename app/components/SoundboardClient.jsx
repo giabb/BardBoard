@@ -1,0 +1,374 @@
+'use client';
+
+/**
+  BardBoard - A DiscordJS bot soundboard
+  Copyright (C) 2024 Giovanbattista Abbate
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import HeaderControls from './soundboard/HeaderControls';
+import SearchBar from './soundboard/SearchBar';
+import PlaylistPanel from './soundboard/PlaylistPanel';
+import TrackButton from './soundboard/TrackButton';
+import { stripExt } from './soundboard/utils';
+
+const COLORS = ['#8b5cf6', '#d4a843', '#e05d8a', '#5aa8d6', '#6fbf9a', '#ef4444', '#f59e0b'];
+
+async function parseJson(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+export default function SoundboardClient() {
+  const [ready, setReady] = useState(false);
+  const [env, setEnv] = useState(null);
+  const [audio, setAudio] = useState({ root: [], categories: {} });
+  const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState({});
+  const [volume, setVolume] = useState(50);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [np, setNp] = useState({ song: null, elapsed: 0, duration: 0, paused: false });
+  const [npElapsed, setNpElapsed] = useState(0);
+  const [seeking, setSeeking] = useState(false);
+  const [playlist, setPlaylist] = useState([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState('');
+  const [uploadCategoryNew, setUploadCategoryNew] = useState('');
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [status, setStatus] = useState({ open: false, title: 'Upload complete', message: 'Your songs are ready.' });
+  const [confirm, setConfirm] = useState({ open: false, title: 'Confirm delete', text: '', action: null });
+  const [authEnabled, setAuthEnabled] = useState(false);
+
+  const npRef = useRef(np);
+  const npPollRef = useRef(0);
+  const seekRef = useRef(null);
+  const lastSentVolumeRef = useRef(50);
+  const channelId = env?.channelId;
+  const uploadMaxMb = Number(env?.uploadMaxMb) > 0 ? Number(env.uploadMaxMb) : 50;
+
+  const fetchApi = useCallback(async (url, options = {}) => {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    return res;
+  }, []);
+
+  const refreshFiles = useCallback(async () => {
+    const res = await fetchApi('/api/audio-files');
+    const data = await parseJson(res);
+    setAudio({ root: Array.isArray(data.root) ? data.root : [], categories: data.categories || {} });
+  }, [fetchApi]);
+
+  const refreshPlaylist = useCallback(async () => {
+    if (!channelId) return;
+    const res = await fetchApi('/api/playlist?channelId=' + encodeURIComponent(channelId));
+    if (res.status === 404) {
+      setPlaylist([]);
+      return;
+    }
+    if (!res.ok) return;
+    const data = await parseJson(res);
+    setPlaylist(Array.isArray(data.queue) ? data.queue : []);
+  }, [channelId, fetchApi]);
+
+  const updateNowPlaying = useCallback(async () => {
+    if (!channelId) return;
+    const res = await fetchApi('/api/now-playing?channelId=' + encodeURIComponent(channelId));
+    if (!res.ok) return;
+    const data = await parseJson(res);
+    const next = { song: data.song || null, elapsed: Number(data.elapsed) || 0, duration: Number(data.duration) || 0, paused: Boolean(data.paused) };
+    const prevSong = npRef.current.song;
+    npRef.current = next;
+    npPollRef.current = performance.now();
+    setNp(next);
+    setPaused(next.paused);
+    setNpElapsed(next.elapsed);
+    if (prevSong !== next.song) void refreshPlaylist();
+  }, [channelId, fetchApi, refreshPlaylist]);
+
+  useEffect(() => { npRef.current = np; }, [np]);
+
+  useEffect(() => {
+    let active = true;
+    document.body.classList.remove('ready');
+    (async () => {
+      const [envRes, authRes] = await Promise.all([
+        fetchApi('/api/env-config'),
+        fetchApi('/api/auth/status')
+      ]);
+      const envData = await parseJson(envRes);
+      const authData = await parseJson(authRes);
+      if (active) {
+        setEnv(envData);
+        setAuthEnabled(Boolean(authData.authEnabled));
+      }
+    })().catch(console.error);
+    return () => { active = false; document.body.classList.remove('ready'); };
+  }, [fetchApi]);
+
+  useEffect(() => {
+    if (!channelId) return;
+    (async () => {
+      try {
+        await refreshFiles();
+        await refreshPlaylist();
+        const [repeatRes, volumeRes, pauseRes] = await Promise.all([
+          fetchApi('/api/repeat-status?channelId=' + encodeURIComponent(channelId)),
+          fetchApi('/api/get-volume?channelId=' + encodeURIComponent(channelId)),
+          fetchApi('/api/pause-status?channelId=' + encodeURIComponent(channelId))
+        ]);
+        setRepeatEnabled(Boolean((await parseJson(repeatRes)).repeatEnabled));
+        const volumePct = Math.round(((await parseJson(volumeRes)).volume || 0.5) * 100);
+        setVolume(volumePct);
+        lastSentVolumeRef.current = volumePct;
+        setPaused(Boolean((await parseJson(pauseRes)).paused));
+        await updateNowPlaying();
+      } finally {
+        setReady(true);
+        document.body.classList.add('ready');
+      }
+    })().catch(console.error);
+  }, [channelId, fetchApi, refreshFiles, refreshPlaylist, updateNowPlaying]);
+
+  useEffect(() => {
+    if (!channelId) return;
+    const poll = window.setInterval(() => void updateNowPlaying(), 1000);
+    const tick = window.setInterval(() => {
+      const cur = npRef.current;
+      if (!cur.song || cur.paused) return;
+      setNpElapsed(Math.min(cur.elapsed + ((performance.now() - npPollRef.current) / 1000), cur.duration || 0));
+    }, 250);
+    return () => { window.clearInterval(poll); window.clearInterval(tick); };
+  }, [channelId, updateNowPlaying]);
+
+  const q = search.trim().toLowerCase();
+  const rootFiles = useMemo(() => audio.root.filter(f => !q || stripExt(f).toLowerCase().includes(q)), [audio.root, q]);
+  const categories = useMemo(() => Object.keys(audio.categories || {}), [audio.categories]);
+  const filteredCategories = useMemo(() => {
+    const out = {};
+    for (const name of categories) {
+      const files = audio.categories[name] || [];
+      const matched = files.filter(f => !q || stripExt(f).toLowerCase().includes(q));
+      if (matched.length) out[name] = matched;
+    }
+    return out;
+  }, [audio.categories, categories, q]);
+
+  const nowTrack = np.song ? stripExt(np.song) : '';
+  const progress = np.duration > 0 ? (npElapsed / np.duration) * 100 : 0;
+
+  const post = useCallback(async (url, body) => fetchApi(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), [fetchApi]);
+
+  const playTrack = async file => { await post('/api/play-audio', { fileName: file, channelId }); await updateNowPlaying(); };
+  const queueTrack = async file => { const res = await post('/api/playlist/add', { fileName: file, channelId }); const data = await parseJson(res); if (Array.isArray(data.queue)) setPlaylist(data.queue); };
+  const setVolumeLocal = v => { setVolume(v); };
+  const commitVolume = useCallback(async () => {
+    if (!channelId) return;
+    const v = volume;
+    if (v === lastSentVolumeRef.current) return;
+    lastSentVolumeRef.current = v;
+    await post('/api/set-volume', { channelId, volume: v / 100 });
+  }, [channelId, post, volume]);
+  const togglePause = async () => { const res = await post('/api/toggle-pause', { channelId }); const data = await parseJson(res); setPaused(Boolean(data.paused)); };
+  const toggleRepeat = async () => { setRepeatEnabled(v => !v); await post('/api/toggle-repeat', { channelId }); };
+  const stopAudio = async () => { await post('/api/stop-audio', { channelId }); await updateNowPlaying(); };
+  const playlistCmd = async path => {
+    try {
+      const apiPath = path.startsWith('/api/') ? path : `/api${path}`;
+      const res = await post(apiPath, { channelId });
+      const data = await parseJson(res);
+      if (!res.ok) throw new Error(data.error || 'Playlist operation failed');
+      if (Array.isArray(data.queue)) setPlaylist(data.queue);
+      await Promise.all([refreshPlaylist(), updateNowPlaying()]);
+    } catch (err) {
+      setStatus({ open: true, title: 'Error', message: err?.message || 'Playlist operation failed.' });
+    }
+  };
+  const setPlaylistOrder = async next => { setPlaylist(next); await post('/api/playlist/set', { channelId, queue: next }); };
+
+  const seekFromClientX = useCallback(async clientX => {
+    if (!channelId || !npRef.current.song || !seekRef.current) return;
+    const rect = seekRef.current.getBoundingClientRect();
+    if (!rect.width) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const target = ratio * (npRef.current.duration || 0);
+    setNpElapsed(target);
+    npRef.current = { ...npRef.current, elapsed: target };
+    npPollRef.current = performance.now();
+    await post('/api/seek', { channelId, offsetSecs: target });
+  }, [channelId, post]);
+
+  useEffect(() => {
+    if (!seeking) return;
+    const onMouseMove = event => { void seekFromClientX(event.clientX); };
+    const onMouseUp = () => setSeeking(false);
+    const onTouchMove = event => {
+      if (event.touches?.[0]) void seekFromClientX(event.touches[0].clientX);
+      event.preventDefault();
+    };
+    const onTouchEnd = () => setSeeking(false);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [seeking, seekFromClientX]);
+
+  const confirmDeleteFile = file => setConfirm({
+    open: true,
+    title: 'Confirm delete',
+    text: `Delete "${stripExt(file.split('/').pop())}"?`,
+    action: async () => {
+      const res = await fetchApi('/api/audio-file?path=' + encodeURIComponent(file), { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await parseJson(res);
+        throw new Error(data.error || 'Delete failed');
+      }
+      await refreshFiles();
+    }
+  });
+
+  const confirmDeleteCategory = name => setConfirm({
+    open: true,
+    title: 'Confirm delete',
+    text: `Delete category "${name}" and all its tracks?`,
+    action: async () => {
+      const res = await fetchApi('/api/audio-category?name=' + encodeURIComponent(name), { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await parseJson(res);
+        throw new Error(data.error || 'Delete failed');
+      }
+      await refreshFiles();
+    }
+  });
+
+  const submitUpload = async e => {
+    e.preventDefault();
+    const category = uploadCategory === '__new__' ? uploadCategoryNew.trim() : uploadCategory;
+    if (!uploadFiles.length) return setStatus({ open: true, title: 'Upload failed', message: 'Select a file first.' });
+    if (uploadCategory === '__new__' && !category) return setStatus({ open: true, title: 'Upload failed', message: 'Enter a new category name.' });
+    const uploadMaxBytes = uploadMaxMb * 1024 * 1024;
+    const oversized = uploadFiles.find(file => Number(file.size || 0) > uploadMaxBytes);
+    if (oversized) {
+      return setStatus({
+        open: true,
+        title: 'Upload failed',
+        message: `Upload exceeds ${uploadMaxMb}MB, so it cannot be performed. "${oversized.name}" is too large.`
+      });
+    }
+
+    setUploadLoading(true);
+    try {
+      for (const file of uploadFiles) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const query = category ? `?category=${encodeURIComponent(category)}` : '';
+        const res = await fetchApi('/api/upload-audio' + query, { method: 'POST', body: fd });
+        if (!res.ok) {
+          const data = await parseJson(res);
+          throw new Error(data.error || 'Upload failed');
+        }
+      }
+      setUploadOpen(false);
+      setUploadFiles([]);
+      setUploadCategory('');
+      setUploadCategoryNew('');
+      await refreshFiles();
+      setStatus({ open: true, title: 'Upload complete', message: 'Your songs are ready.' });
+    } catch (err) {
+      setStatus({ open: true, title: 'Upload failed', message: err?.message || 'Upload failed.' });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <div id="appLoader" className={`app-loader${ready ? ' loaded' : ''}`}><div className="loader-content"><Image className="loader-ouroboros" src="/ouroboros.svg" alt="Loading" width={96} height={96} priority /><p id="loaderMessage">Preparing the Tavern...</p></div></div>
+      <div className="ambient-bg" aria-hidden="true"><div className="particle" /><div className="particle" /><div className="particle" /><div className="particle" /><div className="particle" /><div className="particle" /><div className="particle" /><div className="particle" /></div>
+
+      <HeaderControls
+        paused={paused}
+        repeatEnabled={repeatEnabled}
+        volume={volume}
+        onVolumeChange={setVolumeLocal}
+        onVolumeCommit={commitVolume}
+        onTogglePause={togglePause}
+        onToggleRepeat={toggleRepeat}
+        onStop={stopAudio}
+        np={np}
+        npElapsed={npElapsed}
+        progress={progress}
+        seeking={seeking}
+        setSeeking={setSeeking}
+        seekRef={seekRef}
+        seekFromClientX={seekFromClientX}
+      />
+
+      <main className="soundboard">
+        <SearchBar search={search} onSearchChange={setSearch} onOpenUpload={() => setUploadOpen(true)} />
+
+        <div className="soundboard-layout">
+          <section className="soundboard-main"><div id="audioButtons">
+            {rootFiles.length > 0 && <div className="track-grid cat-colored" style={{ '--cat-color': COLORS[0] }}>{rootFiles.map(file => <TrackButton key={file} file={file} playing={stripExt(file) === nowTrack} onPlay={playTrack} onQueue={queueTrack} onDelete={confirmDeleteFile} />)}</div>}
+            {Object.entries(filteredCategories).map(([name, files], i) => {
+              const isCollapsed = !q && collapsed[name];
+              return <div key={name}><h2 className={`category-header${isCollapsed ? ' collapsed' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }} onClick={() => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }))}><span>{name}</span><button className="cat-delete" type="button" onClick={e => { e.stopPropagation(); confirmDeleteCategory(name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg></button><svg className="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg></h2><div className={`category-wrapper cat-colored${isCollapsed ? ' collapsed' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }}><div className="category-inner"><div className="track-grid">{files.map(file => <TrackButton key={file} file={file} playing={stripExt(file) === nowTrack} onPlay={playTrack} onQueue={queueTrack} onDelete={confirmDeleteFile} />)}</div></div></div></div>;
+            })}
+          </div></section>
+
+          <PlaylistPanel npSong={np.song} playlist={playlist} onPlaylistCmd={playlistCmd} onSetPlaylistOrder={setPlaylistOrder} />
+        </div>
+      </main>
+
+      <div id="uploadModal" className={`upload-modal${uploadOpen ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setUploadOpen(false); }}><div className="upload-panel"><div className="upload-head"><h2 id="uploadTitle">Add Songs</h2><button id="closeUpload" className="upload-close" type="button" onClick={() => setUploadOpen(false)}>&times;</button></div><div id="uploadLoading" className={`upload-loading${uploadLoading ? ' show' : ''}`}><Image className="upload-ouroboros" src="/ouroboros.svg" alt="Uploading" width={90} height={90} /><p>Uploading...</p></div><form id="uploadForm" className="upload-form" onSubmit={e => void submitUpload(e)}><input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden onChange={e => setUploadFiles(prev => [...prev, ...Array.from(e.target.files || [])])} /><label id="uploadDrop" className="upload-drop" htmlFor="uploadFile"><span className="drop-title">Drag your song(s) here</span><span className="drop-sub">or <span className="drop-link">browse</span> your files</span><span id="uploadFileName" className="drop-file">{uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'No files selected'}</span></label><div id="uploadFileList" className="upload-file-list">{uploadFiles.map((f, i) => <div key={`${f.name}-${i}`} className="upload-file-item"><span className="upload-file-name">{f.name}</span><button className="upload-file-remove" type="button" onClick={() => setUploadFiles(prev => prev.filter((_, x) => x !== i))}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg></button></div>)}</div><div className="upload-fields"><label className="field-label" htmlFor="uploadCategorySelect">Category</label><select id="uploadCategorySelect" className="field-select" value={uploadCategory} onChange={e => setUploadCategory(e.target.value)}><option value="">Root (no category)</option><option value="__new__">New category...</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select><div id="newCategoryFields" className={`new-category-fields${uploadCategory === '__new__' ? '' : ' is-hidden'}`}><label className="field-label" htmlFor="uploadCategoryNew">New category name</label><input id="uploadCategoryNew" className="field-input" placeholder="New category name" value={uploadCategoryNew} onChange={e => setUploadCategoryNew(e.target.value)} /></div></div><div className="upload-actions"><button type="submit" className="ctrl-btn ctrl-upload">Upload</button></div></form></div></div>
+
+      <div id="statusModal" className={`status-modal${status.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setStatus(prev => ({ ...prev, open: false })); }}><div className="status-panel"><h2 id="statusTitle">{status.title}</h2><p id="statusMessage">{status.message}</p><div className="status-actions"><button id="statusOk" className="ctrl-btn ctrl-upload" type="button" onClick={() => setStatus(prev => ({ ...prev, open: false }))}>Ok</button></div></div></div>
+      <div id="confirmModal" className={`confirm-modal${confirm.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setConfirm(prev => ({ ...prev, open: false })); }}><div className="confirm-panel"><h2 id="confirmTitle">{confirm.title}</h2><p id="confirmMessage">{confirm.text}</p><div className="confirm-actions"><button id="confirmCancel" className="ctrl-btn" type="button" onClick={() => setConfirm(prev => ({ ...prev, open: false }))}>Cancel</button><button id="confirmOk" className="ctrl-btn confirm-danger" type="button" onClick={() => { const action = confirm.action; setConfirm(prev => ({ ...prev, open: false })); if (action) void action().catch(err => setStatus({ open: true, title: 'Error', message: err?.message || 'Operation failed.' })); }}>Delete</button></div></div></div>
+      <footer className="app-footer">
+        <div className="app-footer-inner">
+          <span className="footer-credit">Made with &hearts; by <a href="https://github.com/giabb" target="_blank" rel="noopener">giabb</a></span>
+          {authEnabled && (
+            <button className="footer-logout" type="button" aria-label="Logout" onClick={() => { window.location.href = '/logout'; }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </footer>
+    </>
+  );
+}
+
+

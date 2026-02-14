@@ -30,6 +30,7 @@ function createDiscordAudioService(discordClient) {
   const currentAudioFile = new Map();
   const currentVolume = new Map();
   const activeAudioResources = new Map();
+  const activeTranscoders = new Map();
   const playStartTime = new Map();
   const trackDurations = new Map();
   const pausedState = new Map();
@@ -47,6 +48,7 @@ function createDiscordAudioService(discordClient) {
       player.stop();
       player.removeAllListeners();
       activeAudioPlayers.delete(guildId);
+      releasePlaybackHandles(guildId);
       currentAudioFile.delete(guildId);
       playStartTime.delete(guildId);
       pausedState.delete(guildId);
@@ -69,6 +71,34 @@ function createDiscordAudioService(discordClient) {
       repeatEnabled.delete(guildId);
       currentAudioFile.delete(guildId);
     }
+  }
+
+  function releasePlaybackHandles(guildId) {
+    const resource = activeAudioResources.get(guildId);
+    if (resource && resource.playStream && typeof resource.playStream.destroy === 'function') {
+      try {
+        resource.playStream.destroy();
+      } catch (error) {
+        console.warn('Error destroying play stream:', error.message);
+      }
+    }
+    activeAudioResources.delete(guildId);
+
+    const transcoder = activeTranscoders.get(guildId);
+    if (transcoder) {
+      try {
+        transcoder.kill();
+      } catch (error) {
+        console.warn('Error stopping transcoder:', error.message);
+      }
+      activeTranscoders.delete(guildId);
+    }
+  }
+
+  function setPlaybackResource(guildId, resource, transcoder = null) {
+    releasePlaybackHandles(guildId);
+    activeAudioResources.set(guildId, resource);
+    if (transcoder) activeTranscoders.set(guildId, transcoder);
   }
 
   function getGuildId(channelId) {
@@ -173,7 +203,7 @@ function createDiscordAudioService(discordClient) {
     const volume = currentVolume.get(guildId) || 0.5;
     resource.volume.setVolume(volume);
 
-    activeAudioResources.set(guildId, resource);
+    setPlaybackResource(guildId, resource, ffmpeg);
     playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
     pausedState.set(guildId, false);
     pausedElapsed.delete(guildId);
@@ -188,6 +218,44 @@ function createDiscordAudioService(discordClient) {
     const guildId = channel.guild.id;
     const player = activeAudioPlayers.get(guildId);
     return Boolean(player && currentAudioFile.get(guildId));
+  }
+
+  function normalizeTrackPath(fileName) {
+    return (fileName || '').toString().replace(/\\/g, '/');
+  }
+
+  function isFileInUse(fileName) {
+    const target = normalizeTrackPath(fileName);
+    if (!target) return false;
+
+    for (const current of currentAudioFile.values()) {
+      if (normalizeTrackPath(current) === target) return true;
+    }
+
+    for (const queue of queueByGuild.values()) {
+      if (!Array.isArray(queue)) continue;
+      if (queue.some(item => normalizeTrackPath(item) === target)) return true;
+    }
+
+    return false;
+  }
+
+  function isCategoryInUse(categoryName) {
+    const prefix = normalizeTrackPath(categoryName).replace(/^\/+|\/+$/g, '');
+    if (!prefix) return false;
+    const categoryPrefix = `${prefix}/`;
+
+    for (const current of currentAudioFile.values()) {
+      const normalized = normalizeTrackPath(current);
+      if (normalized.startsWith(categoryPrefix)) return true;
+    }
+
+    for (const queue of queueByGuild.values()) {
+      if (!Array.isArray(queue)) continue;
+      if (queue.some(item => normalizeTrackPath(item).startsWith(categoryPrefix))) return true;
+    }
+
+    return false;
   }
 
   async function playNextFromQueue(channelId) {
@@ -218,8 +286,7 @@ function createDiscordAudioService(discordClient) {
 
       const existingPlayer = activeAudioPlayers.get(channel.guild.id);
       if (existingPlayer) {
-        existingPlayer.stop();
-        existingPlayer.removeAllListeners();
+        cleanupPlayerOnly(channel.guild.id);
       }
 
       let connection = activeConnections.get(channel.guild.id);
@@ -256,7 +323,7 @@ function createDiscordAudioService(discordClient) {
 
       connection.subscribe(player);
       activeAudioPlayers.set(channel.guild.id, player);
-      activeAudioResources.set(channel.guild.id, resource);
+      setPlaybackResource(channel.guild.id, resource);
 
       playStartTime.set(channel.guild.id, Date.now());
       pausedState.set(channel.guild.id, false);
@@ -279,7 +346,7 @@ function createDiscordAudioService(discordClient) {
               }
               const newResource = createAudioResource(repeatPath, { inlineVolume: true });
               newResource.volume.setVolume(currentVolume.get(channel.guild.id) || 0.5);
-              activeAudioResources.set(channel.guild.id, newResource);
+              setPlaybackResource(channel.guild.id, newResource);
               playStartTime.set(channel.guild.id, Date.now());
               player.play(newResource);
             }
@@ -419,7 +486,7 @@ function createDiscordAudioService(discordClient) {
 
     resource.volume.setVolume(volume);
 
-    activeAudioResources.set(guildId, resource);
+    setPlaybackResource(guildId, resource, ffmpeg);
     playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
 
     const isPaused = pausedState.get(guildId) || false;
@@ -486,7 +553,9 @@ function createDiscordAudioService(discordClient) {
     setCurrentVolume,
     getVolume,
     seek,
-    nowPlaying
+    nowPlaying,
+    isFileInUse,
+    isCategoryInUse
   };
 }
 

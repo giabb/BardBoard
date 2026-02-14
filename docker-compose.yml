@@ -17,14 +17,37 @@
 name: BardBoardAndDragons
 
 services:
-  bard-board-bot:
-    build: .
-    container_name: bot
+  bard-board-web:
+    build:
+      context: .
+      args:
+        BACKEND_URL: http://bard-board-bot:${BOT_PORT:-3001}
+    image: bardboard:local
+    container_name: web
+    command: ["npm", "run", "start:web"]
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:${WEB_PORT:-3000}"
     restart: always
     env_file:
       - .env
+    environment:
+      - BACKEND_URL=http://bard-board-bot:${BOT_PORT:-3001}
+      - PORT=${WEB_PORT:-3000}
+    depends_on:
+      - bard-board-bot
+
+  bard-board-bot:
+    image: bardboard:local
+    container_name: bot
+    command: ["node", "server/app.js"]
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - BOT_PORT=${BOT_PORT:-3001}
+    ports:
+      - "${BOT_PORT:-3001}:${BOT_PORT:-3001}"
     volumes:
       - ./audio-files:/usr/src/app/audio-files
       - ${SESSION_DIR:-./sessions}:/usr/src/app/sessions
+

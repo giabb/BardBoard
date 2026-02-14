@@ -1,0 +1,20 @@
+# Ignore everything by default, then opt-in only what Docker build needs.
+**
+
+# Root runtime/build files used by Dockerfile
+!package.json
+!package-lock.json
+!.npmrc
+!next.config.js
+
+# Next.js app source
+!app/
+!app/**
+
+# Backend source
+!server/
+!server/**
+
+# Public assets
+!public/
+!public/**

@@ -15,8 +15,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-const express = require('express');
 const path = require('path');
+const express = require('express');
 const { Events, Client, GatewayIntentBits } = require('discord.js');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -26,7 +26,8 @@ const fs = require('fs');
 const { createDiscordAudioService } = require('./services/discordAudio');
 const createAudioRoutes = require('./routes/audio');
 const createPlaylistRoutes = require('./routes/playlist');
-const fileRoutes = require('./routes/files');
+const createFileRoutes = require('./routes/files');
+const openApiSpec = require('./docs/openapi');
 
 require('dotenv').config();
 
@@ -50,6 +51,61 @@ const corsOrigins = (process.env.CORS_ORIGINS || '')
   .map(origin => origin.trim())
   .filter(Boolean);
 const sessionDir = process.env.SESSION_DIR || path.join(__dirname, '..', 'sessions');
+const sessionStoreLogFn = (message) => {
+  const text = String(message || '');
+  if (text.includes('ENOENT') && text.includes('[session-file-store]')) return;
+  console.warn(text);
+};
+const sessionStore = new FileStore({
+  path: sessionDir,
+  retries: Number.parseInt(process.env.SESSION_FILE_RETRIES || '5', 10),
+  factor: Number.parseInt(process.env.SESSION_FILE_RETRY_FACTOR || '1', 10),
+  minTimeout: Number.parseInt(process.env.SESSION_FILE_RETRY_MIN_MS || '50', 10),
+  maxTimeout: Number.parseInt(process.env.SESSION_FILE_RETRY_MAX_MS || '200', 10),
+  logFn: sessionStoreLogFn
+});
+
+function withFsRetry(store, methodName) {
+  const original = store[methodName];
+  if (typeof original !== 'function') return;
+
+  store[methodName] = function wrappedStoreMethod(sessionId, sessionData, callback) {
+    const maxAttempts = Math.max(1, Number.parseInt(process.env.SESSION_WRITE_RETRIES || '6', 10));
+    let attempt = 0;
+
+    const run = () => {
+      original.call(store, sessionId, sessionData, (err, value) => {
+        if (err && (err.code === 'EPERM' || err.code === 'EBUSY') && attempt < maxAttempts - 1) {
+          attempt += 1;
+          const delayMs = Math.min(40 * (attempt + 1), 250);
+          return setTimeout(run, delayMs);
+        }
+        if (typeof callback === 'function') callback(err, value);
+      });
+    };
+
+    run();
+  };
+}
+
+function withMissingSessionAsEmpty(store) {
+  const original = store.get;
+  if (typeof original !== 'function') return;
+
+  store.get = function wrappedGet(sessionId, callback) {
+    original.call(store, sessionId, (err, value) => {
+      if (err && err.code === 'ENOENT') {
+        if (typeof callback === 'function') callback(null, null);
+        return;
+      }
+      if (typeof callback === 'function') callback(err, value);
+    });
+  };
+}
+
+withFsRetry(sessionStore, 'set');
+withFsRetry(sessionStore, 'touch');
+withMissingSessionAsEmpty(sessionStore);
 
 function cleanupNonRememberSessions() {
   try {
@@ -88,10 +144,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'change-me',
   resave: false,
   saveUninitialized: false,
-  store: new FileStore({
-    path: sessionDir,
-    retries: 1
-  }),
+  store: sessionStore,
   cookie: {
     httpOnly: true,
     sameSite: 'lax'
@@ -100,17 +153,13 @@ app.use(session({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
-});
-
-app.post('/login', (req, res) => {
-  if (!authEnabled) return res.redirect('/');
+app.post('/auth/login', (req, res) => {
+  if (!authEnabled) return res.status(200).json({ ok: true });
 
   const username = (req.body.username || '').toString();
   const password = (req.body.password || '').toString();
   if (!safeEqual(username, authUser) || !safeEqual(password, authPass)) {
-    return res.status(401).send('Invalid username or password');
+    return res.status(401).json({ error: 'Invalid username or password' });
   }
 
   req.session.authenticated = true;
@@ -118,37 +167,71 @@ app.post('/login', (req, res) => {
   if (req.body.remember) {
     req.session.cookie.maxAge = rememberDays * 24 * 60 * 60 * 1000;
   }
-  return res.redirect('/');
+  return res.status(200).json({ ok: true });
 });
 
-app.get('/logout', (req, res) => {
+app.post('/auth/logout', (req, res) => {
   req.session.destroy(() => {
-    res.redirect('/login');
+    res.status(200).json({ ok: true });
+  });
+});
+
+app.get('/auth/status', (req, res) => {
+  res.status(200).json({
+    authEnabled: Boolean(authEnabled),
+    authenticated: Boolean(req.session && req.session.authenticated)
   });
 });
 
 app.use((req, res, next) => {
   if (!authEnabled) return next();
   if (req.session && req.session.authenticated) return next();
-  if (req.path === '/login' || req.path === '/logout') return next();
-  if (req.path === '/styles.css' || req.path === '/ouroboros.svg' || req.path === '/favicon.ico') return next();
-  if (req.accepts('html')) return res.redirect('/login');
+  if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') return next();
+  if (req.path === '/api-docs' || req.path === '/api-docs.json') return next();
   return res.status(401).json({ error: 'Unauthorized' });
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
 app.get('/env-config', (req, res) => {
-  res.json({ channelId: process.env.CHANNEL_ID });
+  const uploadMaxMb = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
+  res.json({
+    channelId: process.env.CHANNEL_ID,
+    uploadMaxMb
+  });
 });
 
 app.use(createAudioRoutes(audioService));
 app.use(createPlaylistRoutes(audioService));
-app.use(fileRoutes);
+app.use(createFileRoutes(audioService));
+
+app.get('/api-docs.json', (_req, res) => {
+  res.json(openApiSpec);
+});
+
+app.get('/api-docs', (_req, res) => {
+  res.type('html').send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BardBoard API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: '/api-docs.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis],
+      layout: 'BaseLayout',
+      tagsSorter: 'alpha'
+    });
+  </script>
+</body>
+</html>`);
+});
 
 discordClient.on(Events.ClientReady, () => {
   console.log(`Logged in as ${discordClient.user.tag}!`);
@@ -156,4 +239,5 @@ discordClient.on(Events.ClientReady, () => {
 
 discordClient.login(process.env.DISCORD_TOKEN);
 
-app.listen(process.env.BOT_PORT, '0.0.0.0', () => console.log('Server running on port', process.env.BOT_PORT));
+const port = Number.parseInt(process.env.BOT_PORT || '3001', 10);
+app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));

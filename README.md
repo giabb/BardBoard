@@ -11,7 +11,8 @@ Play sound effects, ambient music, and voice lines directly into your voice chan
 [![Docker](https://img.shields.io/badge/Runs%20on-Docker-2496ED.svg)](https://docker.com)
 
 [![Release](https://img.shields.io/github/v/release/giabb/BardBoard)](https://github.com/giabb/BardBoard/releases)
-[![Node](https://img.shields.io/node/v/discord.js)](https://nodejs.org)
+[![Node 24](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-orange?logo=next.js&logoColor=white)](https://nextjs.org)
 <!--[![Stars](https://img.shields.io/github/stars/giabb/BardBoard?style=flat)](https://github.com/giabb/BardBoard/stargazers)
 [![Issues](https://img.shields.io/github/issues/giabb/BardBoard)](https://github.com/giabb/BardBoard/issues)
 [![Discussions](https://img.shields.io/github/discussions/giabb/BardBoard)](https://github.com/giabb/BardBoard/discussions)-->
@@ -99,7 +100,9 @@ That's it. No coding required.
 1. Open a terminal (or PowerShell on Windows) in the BardBoard folder
 2. Run this single command: `docker compose up --build -d`
 3. Wait a few seconds for it to start up
-4. Open your browser and go to **http://localhost:3000**
+4. Open your browser and go to **http://localhost:<WEB_PORT>** (default `http://localhost:3000`)
+
+If you change `BOT_PORT`, `WEB_PORT`, or `BACKEND_URL`, rebuild with `docker compose up --build -d` so the web proxy config is regenerated.
 
 You should see the BardBoard interface. If your voice channel ID is set correctly and the bot is in your server, you're all set! 🎉
 
@@ -107,11 +110,17 @@ You should see the BardBoard interface. If your voice channel ID is set correctl
 
 If you prefer running directly on your machine:
 
-1. Install Node.js (v18+ recommended) and make sure `ffmpeg` is in your PATH.
+1. Install Node.js (v24 recommended) and make sure `ffmpeg` is in your PATH.
 2. Install dependencies: `npm install`
 3. Copy `.env.sample` to `.env` and fill in the required values.
-4. Start the app: `node BardBoard.js`
-5. Open **http://localhost:3000**
+4. Start both processes: `npm run dev`
+5. Open **http://localhost:<WEB_PORT>** (default `http://localhost:3000`)
+
+Useful local scripts:
+- `npm run dev` — start bot + web in development mode.
+- `npm run start` — start bot + web in production mode (after `npm run build`).
+- `npm run dev:bot` / `npm run dev:web` — run only one side while debugging.
+- `npm run lint` / `npm run test` — lint and tests.
 
 ---
 
@@ -150,7 +159,7 @@ You can also delete songs or entire categories directly from the web UI (with a 
 
 ## 🎮 How to Use It
 
-Open **http://localhost:3000** in any browser on your network. Here's what you'll find:
+Open `http://localhost:<WEB_PORT>` in any browser on your network (default **http://localhost:3000**). Here's what you'll find:
 
 ### The Soundboard
 
@@ -174,6 +183,14 @@ Below the playing bar, you can find a search bar. This bar filters songs and cat
 ### Add Song (Upload)
 
 Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one).
+
+### Playlist Panel
+
+Use the playlist panel to manage queued tracks for your selected voice channel.
+- Queue tracks from the soundboard.
+- Reorder the queue with drag and drop.
+- Shuffle, clear, play next, or skip directly from playlist controls.
+- Keep track of what is coming after the current track.
 
 ### Using It on Mobile
 
@@ -206,31 +223,51 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 - You can check what's happening behind the scenes by running `docker compose logs -f` in your terminal — it'll show you any error messages from the bot
 - If you're still stuck, open an [issue](https://github.com/giabb/BardBoard/issues) and I'll help! If you can attach the result of the previous command it will be much easier to understand the issue for me! 
 
+**I want to inspect available API endpoints**
+- Open `http://localhost:<WEB_PORT>/api-docs` for Swagger UI.
+- Open `http://localhost:<WEB_PORT>/api-docs.json` for raw OpenAPI JSON.
+
 ---
 
 ## ⚙️ Advanced Configuration
 
-If you want to tweak limits, auth, or run the UI from another host, these env vars are available:
+If you want to tweak behavior, auth, network, and limits, these env vars are available:
 
-**Core**
-- `BOT_PORT` (default `3000`) — Port for the web UI/API.
+**Required Discord Settings**
 - `DISCORD_TOKEN` — Your bot token (required).
 - `CHANNEL_ID` — Voice channel ID (required).
+
+**Auth and Session Settings**
+- `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
+- `SESSION_SECRET` — Set this to a long random value (32+ chars).
+- `LOGIN_REMEMBER_DAYS` (default `30`) — "Remember me" cookie duration in days.
+- `SESSION_DIR` (default `./sessions`) — Where session files are stored (mounted in Docker).
+
+**Audio File Behavior**
 - `NOISES_FOLDER` (default `!noises`) — Category folder name for overlay sounds.
 
-**Auth & Sessions (optional)**
-- `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
-- `SESSION_SECRET` — Change this from the default `change-me` for security.
-- `SESSION_DIR` (default `./sessions`) — Where session files are stored (mounted in Docker).
-- `LOGIN_REMEMBER_DAYS` (default `30`) — "Remember me" cookie duration in days.
+**Network and Ports**
+- `WEB_PORT` (default `3000`) — Port for the web UI.
+- `BOT_PORT` (default `3001`) — Port for the bot/API server.
+- `BACKEND_URL` (default `http://localhost:3001`) — Web proxy target for API requests (usually auto-set in Docker compose).
+- Keep `BACKEND_URL` aligned with `BOT_PORT` in local runs.
 
-**Uploads & Rate Limits**
+**Uploads and Rate Limit**
 - `UPLOAD_MAX_MB` (default `50`) — Max size (MB) per uploaded file.
 - `RATE_LIMIT_AUDIO` (default `120`) — Requests per minute for audio actions.
 - `RATE_LIMIT_FILES` (default `60`) — Requests per minute for file actions.
+- `RATE_LIMIT_AUDIO_STATUS` (default `600`) — Requests per minute for audio status polling.
+- `RATE_LIMIT_PLAYLIST` (default `120`) — Requests per minute for playlist actions.
 
-**CORS (when UI and API are on different hosts)**
-- `CORS_ORIGINS` — Comma-separated list of allowed origins (leave blank if UI + API are on the same host).
+**CORS (Optional)**
+- `CORS_ORIGINS` — Comma-separated list of allowed origins (leave blank if UI and API are on the same host).
+
+**Session File Retry Tuning**
+- `SESSION_FILE_RETRIES` (default `5`) — File-store retry attempts.
+- `SESSION_FILE_RETRY_FACTOR` (default `1`) — Retry backoff factor.
+- `SESSION_FILE_RETRY_MIN_MS` (default `50`) — Minimum retry delay.
+- `SESSION_FILE_RETRY_MAX_MS` (default `200`) — Maximum retry delay.
+- `SESSION_WRITE_RETRIES` (default `6`) — Extra write retries for transient file-lock races.
 
 **Local (non-Docker) run**
 - `ffmpeg` must be installed and available in your PATH for seek to work.
