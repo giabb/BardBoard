@@ -6,8 +6,8 @@
 *.wav
 *.ogg
 *.m4a
-!audio-files/bonus.mp3
-!audio-files/ambient/test1.mp3
+!audio-files/test1.mp3
+!audio-files/!noises/bonus.mp3
 !audio-files/combat/test2.mp3
 !audio-files/dialogue/test3.mp3
 
