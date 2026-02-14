@@ -176,6 +176,34 @@ const openApiSpec = {
         }
       }
     },
+    '/audio-file/move': {
+      post: {
+        tags: ['files'],
+        summary: 'Move one audio file to another category or root',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['path'],
+                properties: {
+                  path: { type: 'string', description: 'Relative source path, e.g. Category/Song.mp3' },
+                  targetCategory: { type: 'string', description: 'Target category name. Use empty string for root.' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Move completed' },
+          400: { description: 'Invalid path/category or unsupported file type' },
+          404: { description: 'File or category not found' },
+          409: { description: 'File in use or destination conflict' },
+          500: { description: 'Move failed' }
+        }
+      }
+    },
     '/audio-category': {
       delete: {
         tags: ['files'],

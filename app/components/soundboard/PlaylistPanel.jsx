@@ -17,9 +17,23 @@
 */
 import { stripExt } from './utils';
 
-export default function PlaylistPanel({ npSong, playlist, onPlaylistCmd, onSetPlaylistOrder }) {
+export default function PlaylistPanel({
+  npSong,
+  playlist,
+  onPlaylistCmd,
+  onSetPlaylistOrder,
+  onTrackDropToPlaylist,
+  playlistDropActive,
+  onPlaylistDragOver,
+  onPlaylistDragLeave
+}) {
   return (
-    <aside className="playlist-panel">
+    <aside
+      className={`playlist-panel${playlistDropActive ? ' drop-target' : ''}`}
+      onDragOver={onPlaylistDragOver}
+      onDragLeave={onPlaylistDragLeave}
+      onDrop={onTrackDropToPlaylist}
+    >
       <div className="playlist-head">
         <div>
           <h2 className="playlist-heading">Playlist</h2>

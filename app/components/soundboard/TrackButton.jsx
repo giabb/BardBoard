@@ -17,10 +17,21 @@
 */
 import { stripExt } from './utils';
 
-export default function TrackButton({ file, playing, onPlay, onQueue, onDelete }) {
+export default function TrackButton({ file, playing, onPlay, onQueue, onDelete, onDragStart, onDragEnd }) {
   const display = stripExt(file.split('/').pop());
   return (
-    <div className={`track-card${playing ? ' playing' : ''}`}>
+    <div
+      className={`track-card${playing ? ' playing' : ''}`}
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData('application/x-bardboard-track', file);
+        e.dataTransfer.effectAllowed = 'copyMove';
+        if (onDragStart) onDragStart(file);
+      }}
+      onDragEnd={() => {
+        if (onDragEnd) onDragEnd();
+      }}
+    >
       <button className={`track-btn${playing ? ' playing' : ''}`} type="button" onClick={() => void onPlay(file)} aria-label={`Play ${display}`}>
         <span className="track-label">{display}</span>
       </button>

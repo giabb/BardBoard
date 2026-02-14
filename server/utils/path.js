@@ -20,7 +20,7 @@ const { AUDIO_DIR, ALLOWED_EXT } = require('../constants');
 
 function sanitizeCategory(raw) {
   if (!raw) return '';
-  return raw.toString().trim().replace(/[^a-zA-Z0-9 _-]/g, '');
+  return raw.toString().trim().replace(/[^a-zA-Z0-9 _!-]/g, '');
 }
 
 function resolveAudioPath(relativePath) {

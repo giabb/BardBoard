@@ -123,6 +123,74 @@ function createFileRoutes(audioService) {
   });
 
   /**
+   * Handles the `/audio-file/move` API endpoint to move an audio file
+   * to another category (or root folder).
+   *
+   * @route POST /audio-file/move
+   * @body {string} path - Relative source path like "Folder/File.mp3" or "File.mp3".
+   * @body {string} [targetCategory] - Target category folder name, empty string for root.
+   */
+  router.post('/audio-file/move', (req, res) => {
+    const rawPath = (req.body?.path || '').toString();
+    const sourceRelPath = rawPath.replace(/\\/g, '/');
+    if (!sourceRelPath || sourceRelPath.includes('..') || sourceRelPath.startsWith('/')) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
+    if (!hasAllowedExt(sourceRelPath)) {
+      return res.status(400).json({ error: 'Invalid file type' });
+    }
+
+    if (audioService && typeof audioService.isFileInUse === 'function' && audioService.isFileInUse(sourceRelPath)) {
+      return res.status(409).json({ error: 'File is currently in use' });
+    }
+
+    const rawTargetCategory = req.body?.targetCategory;
+    const targetCategoryInput = rawTargetCategory == null ? '' : rawTargetCategory.toString();
+    const targetCategory = sanitizeCategory(targetCategoryInput);
+    if (targetCategoryInput.trim() && !targetCategory) {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    const sourceFullPath = resolveAudioPath(sourceRelPath);
+    if (!sourceFullPath) return res.status(400).json({ error: 'Invalid path' });
+
+    const targetDirPath = targetCategory ? resolveAudioPath(targetCategory) : AUDIO_DIR;
+    if (!targetDirPath) return res.status(400).json({ error: 'Invalid category' });
+
+    const targetFileName = path.basename(sourceRelPath);
+    const targetRelPath = targetCategory ? `${targetCategory}/${targetFileName}` : targetFileName;
+    const targetFullPath = resolveAudioPath(targetRelPath);
+    if (!targetFullPath) return res.status(400).json({ error: 'Invalid target path' });
+
+    if (sourceFullPath === targetFullPath) {
+      return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: false });
+    }
+
+    try {
+      const sourceStat = fs.statSync(sourceFullPath);
+      if (!sourceStat.isFile()) return res.status(400).json({ error: 'Not a file' });
+
+      const targetDirStat = fs.statSync(targetDirPath);
+      if (!targetDirStat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
+
+      if (fs.existsSync(targetFullPath)) {
+        return res.status(409).json({ error: 'A file with the same name already exists in target category' });
+      }
+
+      fs.renameSync(sourceFullPath, targetFullPath);
+      return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: true });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'File or category not found' });
+      if (err && (err.code === 'EPERM' || err.code === 'EBUSY')) {
+        return res.status(409).json({ error: 'File is currently in use' });
+      }
+      console.error('Move file failed:', err);
+      return res.status(500).json({ error: 'Move failed' });
+    }
+  });
+
+  /**
    * Handles the `/audio-category` API endpoint to delete an entire category.
    *
    * @route DELETE /audio-category
