@@ -23,6 +23,7 @@ export default function HeaderControls({
   volume,
   onVolumeChange,
   onVolumeCommit,
+  onToggleMute,
   onTogglePause,
   onToggleRepeat,
   onStop,
@@ -44,11 +45,14 @@ export default function HeaderControls({
         </div>
         <nav className="controls" aria-label="Playback controls">
           <div className="volume-group">
-            <svg className="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
+            <button className="vol-toggle" type="button" onClick={() => void onToggleMute()} aria-label={volume === 0 ? 'Restore volume' : 'Mute volume'}>
+              <svg className="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                {volume === 0
+                  ? <path d="M22 9l-8 8M14 9l8 8"></path>
+                  : <><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></>}
+              </svg>
+            </button>
             <input
               id="volumeSlider"
               type="range"

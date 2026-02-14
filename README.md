@@ -6,13 +6,13 @@
 
 Play sound effects, ambient music, and voice lines directly into your voice channel — all from a single, clean web interface. Perfect for D&D sessions, watch parties, or anything in between.
 
-[![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)](LICENSE.md)
+[![License](https://img.shields.io/badge/License-GPL%203.0-B91C1C.svg)](LICENSE.md)
 [![Discord](https://img.shields.io/badge/Made%20for-Discord-5865F2.svg)](https://discord.com)
-[![Docker](https://img.shields.io/badge/Runs%20on-Docker-2496ED.svg)](https://docker.com)
+[![Docker](https://img.shields.io/badge/Runs%20on-Docker-0EA5E9.svg)](https://docker.com)
 
 [![Release](https://img.shields.io/github/v/release/giabb/BardBoard)](https://github.com/giabb/BardBoard/releases)
-[![Node 24](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-orange?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Node 24](https://img.shields.io/badge/node-24-16A34A?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-F59E0B?logo=next.js&logoColor=white)](https://nextjs.org)
 <!--[![Stars](https://img.shields.io/github/stars/giabb/BardBoard?style=flat)](https://github.com/giabb/BardBoard/stargazers)
 [![Issues](https://img.shields.io/github/issues/giabb/BardBoard)](https://github.com/giabb/BardBoard/issues)
 [![Discussions](https://img.shields.io/github/discussions/giabb/BardBoard)](https://github.com/giabb/BardBoard/discussions)-->
@@ -128,7 +128,7 @@ Useful local scripts:
 
 You can add sounds in two ways:
 
-- **In-browser upload:** Click **Add Song**, drag & drop files (or browse), pick a category or create a new one, then upload.
+- **In-browser upload:** Click **Add Song**, drag & drop files (or browse), pick a category or create a new one, then upload. The modal supports multi-file queues, shows upload progress, and stays scrollable for large batches.
 - **Manual:** Drop audio files into the `audio-files` folder inside the project directory. Refresh the page to see them.
 
 **Supported formats:** MP3, WAV, OGG, M4A
@@ -154,6 +154,7 @@ This would give you a soundboard with a few loose sounds at the top, then a **Co
 
 The categories can be collapsed and expanded, and each category has its own colour!
 You can also delete songs or entire categories directly from the web UI (with a confirmation prompt).
+You can drag songs between categories to move the underlying file on disk, including moving songs back to the root (no category).
 
 ---
 
@@ -164,10 +165,12 @@ Open `http://localhost:<WEB_PORT>` in any browser on your network (default **htt
 ### The Soundboard
 
 The main area of the page is your soundboard — a grid of buttons, one per sound, optionally divided by categories. Just **tap or click** a button and it plays in your Discord voice channel immediately. The button for the currently playing sound lights up so you always know what's on.
+You can also drag a song onto another category to move it there.
 
 ### The Controls (top bar)
 
-- 🔊 **Volume slider** — Drag it left or right to adjust how loud the sound plays in Discord. Changes apply instantly.
+- 🔊 **Volume slider** — Drag it left or right to adjust how loud the sound plays in Discord, then release to apply.
+- 🔈 **Speaker icon (mute toggle)** — Click once to mute (set volume to 0), click again to restore your last non-zero volume.
 - ⏸️ **Pause / ▶️ Resume** — Tap this to pause the current sound and to enable resume button. Tap again to resume the song.
 - 🔁 **Repeat** — Tap this to loop the current sound. It'll keep playing on repeat until you stop it or play something else. Tap again to turn it off.
 - ⏹️ **Stop** — Stops whatever is currently playing.
@@ -182,12 +185,13 @@ Below the playing bar, you can find a search bar. This bar filters songs and cat
 
 ### Add Song (Upload)
 
-Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one).
+Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one). The upload overlay shows a progress bar and percentage while files are being sent.
 
 ### Playlist Panel
 
 Use the playlist panel to manage queued tracks for your selected voice channel.
 - Queue tracks from the soundboard.
+- Drag songs from the soundboard directly into the playlist panel to queue them without moving/deleting the original file.
 - Reorder the queue with drag and drop.
 - Shuffle, clear, play next, or skip directly from playlist controls.
 - Keep track of what is coming after the current track.
@@ -250,7 +254,7 @@ If you want to tweak behavior, auth, network, and limits, these env vars are ava
 - `WEB_PORT` (default `3000`) — Port for the web UI.
 - `BOT_PORT` (default `3001`) — Port for the bot/API server.
 - `BACKEND_URL` (default `http://localhost:3001`) — Web proxy target for API requests (usually auto-set in Docker compose).
-- Keep `BACKEND_URL` aligned with `BOT_PORT` in local runs.
+- `BACKEND_URL` in `.env` is not expanded from other vars, so set it explicitly (for example `http://localhost:3001`).
 
 **Uploads and Rate Limit**
 - `UPLOAD_MAX_MB` (default `50`) — Max size (MB) per uploaded file.

@@ -23,6 +23,7 @@ import HeaderControls from './soundboard/HeaderControls';
 import SearchBar from './soundboard/SearchBar';
 import PlaylistPanel from './soundboard/PlaylistPanel';
 import TrackButton from './soundboard/TrackButton';
+import TrashIcon from './icons/TrashIcon';
 import { stripExt } from './soundboard/utils';
 
 const COLORS = ['#8b5cf6', '#d4a843', '#e05d8a', '#5aa8d6', '#6fbf9a', '#ef4444', '#f59e0b'];
@@ -76,6 +77,7 @@ export default function SoundboardClient() {
   const npPollRef = useRef(0);
   const seekRef = useRef(null);
   const lastSentVolumeRef = useRef(50);
+  const lastNonZeroVolumeRef = useRef(50);
   const channelId = env?.channelId;
   const uploadMaxMb = Number(env?.uploadMaxMb) > 0 ? Number(env.uploadMaxMb) : 50;
 
@@ -156,6 +158,7 @@ export default function SoundboardClient() {
         const volumePct = Math.round(((await parseJson(volumeRes)).volume || 0.5) * 100);
         setVolume(volumePct);
         lastSentVolumeRef.current = volumePct;
+        if (volumePct > 0) lastNonZeroVolumeRef.current = volumePct;
         setPaused(Boolean((await parseJson(pauseRes)).paused));
         await updateNowPlaying();
       } finally {
@@ -236,7 +239,10 @@ export default function SoundboardClient() {
     if (!res.ok) throw new Error(data.error || 'Queue operation failed');
     if (Array.isArray(data.queue)) setPlaylist(data.queue);
   };
-  const setVolumeLocal = v => { setVolume(v); };
+  const setVolumeLocal = v => {
+    setVolume(v);
+    if (v > 0) lastNonZeroVolumeRef.current = v;
+  };
   const commitVolume = useCallback(async () => {
     if (!channelId) return;
     const v = volume;
@@ -247,6 +253,19 @@ export default function SoundboardClient() {
   const togglePause = async () => { const res = await post('/api/toggle-pause', { channelId }); const data = await parseJson(res); setPaused(Boolean(data.paused)); };
   const toggleRepeat = async () => { setRepeatEnabled(v => !v); await post('/api/toggle-repeat', { channelId }); };
   const stopAudio = async () => { await post('/api/stop-audio', { channelId }); await updateNowPlaying(); };
+  const toggleMute = async () => {
+    if (volume === 0) {
+      const restored = Math.max(1, Math.min(100, lastNonZeroVolumeRef.current || 50));
+      setVolume(restored);
+      lastSentVolumeRef.current = restored;
+      await post('/api/set-volume', { channelId, volume: restored / 100 });
+      return;
+    }
+    if (volume > 0) lastNonZeroVolumeRef.current = volume;
+    setVolume(0);
+    lastSentVolumeRef.current = 0;
+    await post('/api/set-volume', { channelId, volume: 0 });
+  };
   const playlistCmd = async path => {
     try {
       const apiPath = path.startsWith('/api/') ? path : `/api${path}`;
@@ -454,6 +473,7 @@ export default function SoundboardClient() {
         volume={volume}
         onVolumeChange={setVolumeLocal}
         onVolumeCommit={commitVolume}
+        onToggleMute={toggleMute}
         onTogglePause={togglePause}
         onToggleRepeat={toggleRepeat}
         onStop={stopAudio}
@@ -494,7 +514,7 @@ export default function SoundboardClient() {
             {Object.entries(filteredCategories).map(([name, files], i) => {
               const isCollapsed = !q && collapsed[name];
               const isCategoryDropTarget = categoryDropTarget === name;
-              return <div key={name}><h2 className={`category-header${isCollapsed ? ' collapsed' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }} onClick={() => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }))} onDragOver={e => handleCategoryDragOver(e, name, name)} onDrop={e => void handleCategoryDrop(e, name)} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget) && categoryDropTarget === name) setCategoryDropTarget(''); }}><span>{name}</span><button className="cat-delete" type="button" onClick={e => { e.stopPropagation(); confirmDeleteCategory(name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg></button><svg className="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg></h2><div className={`category-wrapper cat-colored${isCollapsed ? ' collapsed' : ''}${isCategoryDropTarget ? ' drop-target' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }} onDragOver={e => handleCategoryDragOver(e, name, name)} onDrop={e => void handleCategoryDrop(e, name)} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget) && categoryDropTarget === name) setCategoryDropTarget(''); }}><div className="category-inner"><div className="track-grid">{files.map(file => <TrackButton key={file} file={file} playing={stripExt(file) === nowTrack} onPlay={playTrack} onQueue={queueTrack} onDelete={confirmDeleteFile} onDragStart={onTrackDragStart} onDragEnd={onTrackDragEnd} />)}</div></div></div></div>;
+              return <div key={name}><h2 className={`category-header${isCollapsed ? ' collapsed' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }} onClick={() => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }))} onDragOver={e => handleCategoryDragOver(e, name, name)} onDrop={e => void handleCategoryDrop(e, name)} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget) && categoryDropTarget === name) setCategoryDropTarget(''); }}><span>{name}</span><button className="cat-delete" type="button" onClick={e => { e.stopPropagation(); confirmDeleteCategory(name); }}><TrashIcon /></button><svg className="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg></h2><div className={`category-wrapper cat-colored${isCollapsed ? ' collapsed' : ''}${isCategoryDropTarget ? ' drop-target' : ''}`} style={{ '--cat-color': COLORS[(i + 1) % COLORS.length] }} onDragOver={e => handleCategoryDragOver(e, name, name)} onDrop={e => void handleCategoryDrop(e, name)} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget) && categoryDropTarget === name) setCategoryDropTarget(''); }}><div className="category-inner"><div className="track-grid">{files.map(file => <TrackButton key={file} file={file} playing={stripExt(file) === nowTrack} onPlay={playTrack} onQueue={queueTrack} onDelete={confirmDeleteFile} onDragStart={onTrackDragStart} onDragEnd={onTrackDragEnd} />)}</div></div></div></div>;
             })}
           </div></section>
 
@@ -502,7 +522,7 @@ export default function SoundboardClient() {
         </div>
       </main>
 
-      <div id="uploadModal" className={`upload-modal${uploadOpen ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setUploadOpen(false); }}><div className="upload-panel"><div className="upload-head"><h2 id="uploadTitle">Add Songs</h2><button id="closeUpload" className="upload-close" type="button" onClick={() => setUploadOpen(false)}>&times;</button></div><div id="uploadLoading" className={`upload-loading${uploadLoading ? ' show' : ''}`}><Image className="upload-ouroboros" src="/ouroboros.svg" alt="Uploading" width={90} height={90} /><p>Uploading... {uploadProgress}%</p><div className="upload-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={uploadProgress}><div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} /></div></div><form id="uploadForm" className="upload-form" onSubmit={e => void submitUpload(e)}><input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden onChange={e => setUploadFiles(prev => [...prev, ...Array.from(e.target.files || [])])} /><label id="uploadDrop" className="upload-drop" htmlFor="uploadFile"><span className="drop-title">Drag your song(s) here</span><span className="drop-sub">or <span className="drop-link">browse</span> your files</span><span id="uploadFileName" className="drop-file">{uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'No files selected'}</span></label><div id="uploadFileList" className="upload-file-list">{uploadFiles.map((f, i) => <div key={`${f.name}-${i}`} className="upload-file-item"><span className="upload-file-index">{i + 1}.</span><span className="upload-file-name">{f.name}</span><button className="upload-file-remove" type="button" onClick={() => setUploadFiles(prev => prev.filter((_, x) => x !== i))}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg></button></div>)}</div><div className="upload-fields"><label className="field-label" htmlFor="uploadCategorySelect">Category</label><select id="uploadCategorySelect" className="field-select" value={uploadCategory} onChange={e => setUploadCategory(e.target.value)}><option value="">Root (no category)</option><option value="__new__">New category...</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select><div id="newCategoryFields" className={`new-category-fields${uploadCategory === '__new__' ? '' : ' is-hidden'}`}><label className="field-label" htmlFor="uploadCategoryNew">New category name</label><input id="uploadCategoryNew" className="field-input" placeholder="New category name" value={uploadCategoryNew} onChange={e => setUploadCategoryNew(e.target.value)} /></div></div><div className="upload-actions"><button type="submit" className="ctrl-btn ctrl-upload">Upload</button></div></form></div></div>
+      <div id="uploadModal" className={`upload-modal${uploadOpen ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setUploadOpen(false); }}><div className="upload-panel"><div className="upload-head"><h2 id="uploadTitle">Add Songs</h2><button id="closeUpload" className="upload-close" type="button" onClick={() => setUploadOpen(false)}>&times;</button></div><div id="uploadLoading" className={`upload-loading${uploadLoading ? ' show' : ''}`}><Image className="upload-ouroboros" src="/ouroboros.svg" alt="Uploading" width={90} height={90} /><p>Uploading... {uploadProgress}%</p><div className="upload-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={uploadProgress}><div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} /></div></div><form id="uploadForm" className="upload-form" onSubmit={e => void submitUpload(e)}><input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden onChange={e => setUploadFiles(prev => [...prev, ...Array.from(e.target.files || [])])} /><label id="uploadDrop" className="upload-drop" htmlFor="uploadFile"><span className="drop-title">Drag your song(s) here</span><span className="drop-sub">or <span className="drop-link">browse</span> your files</span><span id="uploadFileName" className="drop-file">{uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'No files selected'}</span></label><div id="uploadFileList" className="upload-file-list">{uploadFiles.map((f, i) => <div key={`${f.name}-${i}`} className="upload-file-item"><span className="upload-file-index">{i + 1}.</span><span className="upload-file-name">{f.name}</span><button className="upload-file-remove" type="button" onClick={() => setUploadFiles(prev => prev.filter((_, x) => x !== i))}><TrashIcon /></button></div>)}</div><div className="upload-fields"><label className="field-label" htmlFor="uploadCategorySelect">Category</label><select id="uploadCategorySelect" className="field-select" value={uploadCategory} onChange={e => setUploadCategory(e.target.value)}><option value="">Root (no category)</option><option value="__new__">New category...</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select><div id="newCategoryFields" className={`new-category-fields${uploadCategory === '__new__' ? '' : ' is-hidden'}`}><label className="field-label" htmlFor="uploadCategoryNew">New category name</label><input id="uploadCategoryNew" className="field-input" placeholder="New category name" value={uploadCategoryNew} onChange={e => setUploadCategoryNew(e.target.value)} /></div></div><div className="upload-actions"><button type="submit" className="ctrl-btn ctrl-upload">Upload</button></div></form></div></div>
 
       <div id="statusModal" className={`status-modal${status.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setStatus(prev => ({ ...prev, open: false })); }}><div className="status-panel"><h2 id="statusTitle">{status.title}</h2><p id="statusMessage">{status.message}</p><div className="status-actions"><button id="statusOk" className="ctrl-btn ctrl-upload" type="button" onClick={() => setStatus(prev => ({ ...prev, open: false }))}>Ok</button></div></div></div>
       <div id="confirmModal" className={`confirm-modal${confirm.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setConfirm(prev => ({ ...prev, open: false })); }}><div className="confirm-panel"><h2 id="confirmTitle">{confirm.title}</h2><p id="confirmMessage">{confirm.text}</p><div className="confirm-actions"><button id="confirmCancel" className="ctrl-btn" type="button" onClick={() => setConfirm(prev => ({ ...prev, open: false }))}>Cancel</button><button id="confirmOk" className="ctrl-btn confirm-danger" type="button" onClick={() => { const action = confirm.action; setConfirm(prev => ({ ...prev, open: false })); if (action) void action().catch(err => setStatus({ open: true, title: 'Error', message: err?.message || 'Operation failed.' })); }}>Delete</button></div></div></div>
