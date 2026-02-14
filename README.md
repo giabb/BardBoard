@@ -11,11 +11,13 @@ Play sound effects, ambient music, and voice lines directly into your voice chan
 [![Docker](https://img.shields.io/badge/Runs%20on-Docker-0EA5E9.svg)](https://docker.com)
 
 [![Release](https://img.shields.io/github/v/release/giabb/BardBoard)](https://github.com/giabb/BardBoard/releases)
-[![Node 24](https://img.shields.io/badge/node-24-16A34A?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-F59E0B?logo=next.js&logoColor=white)](https://nextjs.org)
-<!--[![Stars](https://img.shields.io/github/stars/giabb/BardBoard?style=flat)](https://github.com/giabb/BardBoard/stargazers)
 [![Issues](https://img.shields.io/github/issues/giabb/BardBoard)](https://github.com/giabb/BardBoard/issues)
-[![Discussions](https://img.shields.io/github/discussions/giabb/BardBoard)](https://github.com/giabb/BardBoard/discussions)-->
+[![Discussions](https://img.shields.io/github/discussions/giabb/BardBoard)](https://github.com/giabb/BardBoard/discussions)
+<!--[![Stars](https://img.shields.io/github/stars/giabb/BardBoard?style=flat)](https://github.com/giabb/BardBoard/stargazers)-->
+
+[![Node 24](https://img.shields.io/badge/node-24-16A34A?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-orange?logo=next.js&logoColor=white)](https://nextjs.org)
+
 
 
 </div>
