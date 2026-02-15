@@ -15,12 +15,16 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatTime } from './utils';
 
 export default function HeaderControls({
   paused,
   repeatEnabled,
   volume,
+  channelId,
+  channels,
+  onChannelChange,
   onVolumeChange,
   onVolumeCommit,
   onToggleMute,
@@ -35,6 +39,96 @@ export default function HeaderControls({
   seekRef,
   seekFromClientX
 }) {
+  const [channelOpen, setChannelOpen] = useState(false);
+  const [activeChannelId, setActiveChannelId] = useState(channelId || '');
+  const channelPickerRef = useRef(null);
+
+  useEffect(() => {
+    setActiveChannelId(channelId || '');
+  }, [channelId]);
+
+  useEffect(() => {
+    const onMouseDown = event => {
+      if (!channelPickerRef.current) return;
+      if (!channelPickerRef.current.contains(event.target)) setChannelOpen(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
+  const channelsByGuild = useMemo(() => channels.reduce((acc, channel) => {
+    if (!acc[channel.guildId]) {
+      acc[channel.guildId] = { guildName: channel.guildName, channels: [] };
+    }
+    acc[channel.guildId].channels.push(channel);
+    return acc;
+  }, {}), [channels]);
+
+  const flatChannels = useMemo(
+    () => channels.map(ch => ({ channelId: ch.channelId, channelName: ch.channelName, guildName: ch.guildName })),
+    [channels]
+  );
+  const selectedChannel = flatChannels.find(ch => ch.channelId === channelId) || null;
+  const activeIndex = flatChannels.findIndex(ch => ch.channelId === activeChannelId);
+
+  const openPicker = (fallbackIndex) => {
+    if (!flatChannels.length) return;
+    setChannelOpen(true);
+    if (!activeChannelId) {
+      const idx = Math.max(0, Math.min(flatChannels.length - 1, fallbackIndex));
+      setActiveChannelId(flatChannels[idx].channelId);
+    }
+  };
+
+  const selectChannel = (nextId) => {
+    setActiveChannelId(nextId);
+    setChannelOpen(false);
+    void onChannelChange(nextId);
+  };
+
+  const onTriggerKeyDown = event => {
+    if (!flatChannels.length) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      openPicker(activeIndex >= 0 ? activeIndex : 0);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      openPicker(activeIndex >= 0 ? activeIndex : flatChannels.length - 1);
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setChannelOpen(v => !v);
+    }
+  };
+
+  const onMenuKeyDown = event => {
+    if (!flatChannels.length) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setChannelOpen(false);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const next = activeIndex < 0 ? 0 : Math.min(flatChannels.length - 1, activeIndex + 1);
+      setActiveChannelId(flatChannels[next].channelId);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const next = activeIndex < 0 ? flatChannels.length - 1 : Math.max(0, activeIndex - 1);
+      setActiveChannelId(flatChannels[next].channelId);
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (activeIndex >= 0) selectChannel(flatChannels[activeIndex].channelId);
+    }
+  };
+
   return (
     <header className="app-header">
       <div className="header-inner">
@@ -42,6 +136,52 @@ export default function HeaderControls({
           <span className="brand-icon">&#127925;</span>
           <h1 className="brand-title">BardBoard <span className="ampersand">&amp;</span> Dragons</h1>
           <span className="brand-icon dragon">&#128009;</span>
+        </div>
+        <div className="channel-group" ref={channelPickerRef}>
+          <label className="channel-label" htmlFor="channelSelect">Channel</label>
+          <button
+            id="channelSelect"
+            type="button"
+            className={`channel-trigger${channelOpen ? ' open' : ''}`}
+            aria-haspopup="listbox"
+            aria-expanded={channelOpen}
+            aria-label="Select voice channel"
+            onClick={() => setChannelOpen(v => !v)}
+            onKeyDown={onTriggerKeyDown}
+          >
+            <span className="channel-trigger-text">
+              {selectedChannel ? selectedChannel.channelName : (channels.length ? 'Select a channel' : 'No channels available')}
+            </span>
+            <svg className="channel-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {channelOpen && (
+            <div className="channel-menu" role="listbox" tabIndex={0} onKeyDown={onMenuKeyDown} aria-label="Voice channel options">
+              {Object.entries(channelsByGuild).map(([guildId, group]) => (
+                <div key={guildId} className="channel-section">
+                  <div className="channel-section-title">{group.guildName}</div>
+                  {group.channels.map(ch => {
+                    const isSelected = ch.channelId === channelId;
+                    const isActive = ch.channelId === activeChannelId;
+                    return (
+                      <button
+                        key={ch.channelId}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`channel-option${isSelected ? ' selected' : ''}${isActive ? ' active' : ''}`}
+                        onMouseEnter={() => setActiveChannelId(ch.channelId)}
+                        onClick={() => selectChannel(ch.channelId)}
+                      >
+                        {ch.channelName}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <nav className="controls" aria-label="Playback controls">
           <div className="volume-group">
@@ -115,4 +255,3 @@ export default function HeaderControls({
     </header>
   );
 }
-

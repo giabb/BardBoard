@@ -199,6 +199,33 @@ app.get('/env-config', (req, res) => {
   });
 });
 
+app.get('/voice-channels', (_req, res) => {
+  const channels = [];
+
+  for (const guild of discordClient.guilds.cache.values()) {
+    for (const channel of guild.channels.cache.values()) {
+      if (typeof channel.isVoiceBased !== 'function' || !channel.isVoiceBased()) continue;
+      channels.push({
+        guildId: guild.id,
+        guildName: guild.name,
+        channelId: channel.id,
+        channelName: channel.name,
+        label: `${guild.name} / ${channel.name}`,
+        position: Number(channel.rawPosition) || 0
+      });
+    }
+  }
+
+  channels.sort((a, b) => {
+    const guildCmp = a.guildName.localeCompare(b.guildName);
+    if (guildCmp !== 0) return guildCmp;
+    if (a.position !== b.position) return a.position - b.position;
+    return a.channelName.localeCompare(b.channelName);
+  });
+
+  res.json({ channels });
+});
+
 app.use(createAudioRoutes(audioService));
 app.use(createPlaylistRoutes(audioService));
 app.use(createFileRoutes(audioService));

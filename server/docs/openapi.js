@@ -176,6 +176,30 @@ const openApiSpec = {
         }
       }
     },
+    '/voice-channels': {
+      get: {
+        tags: ['system'],
+        summary: 'List voice channels visible to the bot',
+        responses: {
+          200: {
+            description: 'Voice channel list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    channels: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/VoiceChannelOption' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     '/audio-file/move': {
       post: {
         tags: ['files'],
@@ -275,6 +299,21 @@ const openApiSpec = {
         responses: {
           200: { description: 'Stopped' },
           400: { description: 'Invalid channelId' }
+        }
+      }
+    },
+    '/switch-channel': {
+      post: {
+        tags: ['audio'],
+        summary: 'Switch bot voice connection to another channel',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/ChannelRequest' } } }
+        },
+        responses: {
+          200: { description: 'Switched' },
+          400: { description: 'Invalid channelId' },
+          404: { description: 'Channel not found' }
         }
       }
     },
@@ -518,6 +557,17 @@ const openApiSpec = {
             type: 'object',
             additionalProperties: { type: 'array', items: { type: 'string' } }
           }
+        }
+      },
+      VoiceChannelOption: {
+        type: 'object',
+        properties: {
+          guildId: { type: 'string' },
+          guildName: { type: 'string' },
+          channelId: { type: 'string' },
+          channelName: { type: 'string' },
+          label: { type: 'string' },
+          position: { type: 'integer' }
         }
       },
       NowPlaying: {

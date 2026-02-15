@@ -290,6 +290,16 @@ function createDiscordAudioService(discordClient) {
       }
 
       let connection = activeConnections.get(channel.guild.id);
+      if (connection && connection.joinConfig && connection.joinConfig.channelId !== channel.id) {
+        try {
+          connection.destroy();
+          connection.removeAllListeners();
+        } catch (error) {
+          console.error('Error switching connection channel:', error);
+        }
+        activeConnections.delete(channel.guild.id);
+        connection = null;
+      }
       if (!connection) {
         connection = joinVoiceChannel({
           channelId: channel.id,
@@ -410,6 +420,47 @@ function createDiscordAudioService(discordClient) {
       return true;
     }
     return false;
+  }
+
+  function switchVoiceChannel(channelId) {
+    const channel = getChannel(channelId);
+    if (!channel) return false;
+
+    const guildId = channel.guild.id;
+    let connection = activeConnections.get(guildId);
+    if (connection && connection.joinConfig && connection.joinConfig.channelId === channel.id) {
+      return true;
+    }
+
+    if (connection) {
+      try {
+        connection.destroy();
+        connection.removeAllListeners();
+      } catch (error) {
+        console.error('Error switching connection channel:', error);
+      }
+      activeConnections.delete(guildId);
+      connection = null;
+    }
+
+    connection = joinVoiceChannel({
+      channelId: channel.id,
+      guildId,
+      adapterCreator: channel.guild.voiceAdapterCreator
+    });
+    activeConnections.set(guildId, connection);
+
+    connection.on('error', (error) => {
+      console.error(`Connection error: ${error.message}`);
+      cleanupResources(guildId);
+    });
+
+    const player = activeAudioPlayers.get(guildId);
+    if (player) {
+      connection.subscribe(player);
+    }
+
+    return true;
   }
 
   function toggleRepeat(channelId) {
@@ -548,6 +599,7 @@ function createDiscordAudioService(discordClient) {
     togglePause,
     getPauseStatus,
     stopAudioInDiscord,
+    switchVoiceChannel,
     toggleRepeat,
     getRepeatStatus,
     setCurrentVolume,

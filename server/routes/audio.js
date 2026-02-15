@@ -84,6 +84,14 @@ function createAudioRoutes(audioService) {
     res.sendStatus(200);
   });
 
+  router.post('/switch-channel', actionLimiter, (req, res) => {
+    const { channelId } = req.body;
+    if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    const ok = audioService.switchVoiceChannel(channelId);
+    if (!ok) return res.sendStatus(404);
+    res.sendStatus(200);
+  });
+
   router.post('/toggle-repeat', actionLimiter, (req, res) => {
     const { channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
