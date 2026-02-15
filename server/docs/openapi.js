@@ -46,7 +46,6 @@ const openApiSpec = {
                 schema: {
                   type: 'object',
                   properties: {
-                    channelId: { type: 'string' },
                     uploadMaxMb: { type: 'integer', minimum: 1 }
                   }
                 }
@@ -566,7 +565,6 @@ const openApiSpec = {
           guildName: { type: 'string' },
           channelId: { type: 'string' },
           channelName: { type: 'string' },
-          label: { type: 'string' },
           position: { type: 'integer' }
         }
       },

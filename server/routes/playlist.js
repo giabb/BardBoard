@@ -17,7 +17,7 @@
 */
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { resolveAudioPath, hasAllowedExt } = require('../utils/path');
+const { normalizeAudioFileName, isValidChannelId } = require('../utils/validation');
 
 function createPlaylistRoutes(audioService) {
   const router = express.Router();
@@ -27,20 +27,6 @@ function createPlaylistRoutes(audioService) {
     standardHeaders: 'draft-7',
     legacyHeaders: false
   });
-
-  function isValidChannelId(channelId) {
-    return typeof channelId === 'string' && /^\d{17,20}$/.test(channelId);
-  }
-
-  function normalizeFileName(raw) {
-    if (!raw) return null;
-    const relPath = raw.toString().replace(/\\/g, '/');
-    if (relPath.includes('..') || relPath.startsWith('/')) return null;
-    if (!hasAllowedExt(relPath)) return null;
-    const fullPath = resolveAudioPath(relPath);
-    if (!fullPath) return null;
-    return relPath;
-  }
 
   router.use(limiter);
 
@@ -55,7 +41,7 @@ function createPlaylistRoutes(audioService) {
   router.post('/playlist/add', (req, res) => {
     const { channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
-    const safeFile = normalizeFileName(req.body.fileName);
+    const safeFile = normalizeAudioFileName(req.body.fileName);
     if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
     const queue = audioService.addToQueue(channelId, safeFile);
     if (!queue) return res.status(404).json({ error: 'Channel not found' });
@@ -69,7 +55,7 @@ function createPlaylistRoutes(audioService) {
     if (!Array.isArray(rawQueue)) return res.status(400).json({ error: 'Invalid queue' });
     const safeQueue = [];
     for (const item of rawQueue) {
-      const safeFile = normalizeFileName(item);
+      const safeFile = normalizeAudioFileName(item);
       if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
       safeQueue.push(safeFile);
     }

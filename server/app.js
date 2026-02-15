@@ -194,7 +194,6 @@ app.use((req, res, next) => {
 app.get('/env-config', (req, res) => {
   const uploadMaxMb = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
   res.json({
-    channelId: process.env.CHANNEL_ID,
     uploadMaxMb
   });
 });
@@ -210,7 +209,6 @@ app.get('/voice-channels', (_req, res) => {
         guildName: guild.name,
         channelId: channel.id,
         channelName: channel.name,
-        label: `${guild.name} / ${channel.name}`,
         position: Number(channel.rawPosition) || 0
       });
     }

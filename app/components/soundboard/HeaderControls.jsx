@@ -40,12 +40,8 @@ export default function HeaderControls({
   seekFromClientX
 }) {
   const [channelOpen, setChannelOpen] = useState(false);
-  const [activeChannelId, setActiveChannelId] = useState(channelId || '');
+  const [activeChannelId, setActiveChannelId] = useState('');
   const channelPickerRef = useRef(null);
-
-  useEffect(() => {
-    setActiveChannelId(channelId || '');
-  }, [channelId]);
 
   useEffect(() => {
     const onMouseDown = event => {
@@ -74,10 +70,21 @@ export default function HeaderControls({
   const openPicker = (fallbackIndex) => {
     if (!flatChannels.length) return;
     setChannelOpen(true);
-    if (!activeChannelId) {
+    const current = channelId || activeChannelId;
+    if (current) {
+      setActiveChannelId(current);
+    } else {
       const idx = Math.max(0, Math.min(flatChannels.length - 1, fallbackIndex));
       setActiveChannelId(flatChannels[idx].channelId);
     }
+  };
+
+  const togglePicker = () => {
+    if (channelOpen) {
+      setChannelOpen(false);
+      return;
+    }
+    openPicker(activeIndex >= 0 ? activeIndex : 0);
   };
 
   const selectChannel = (nextId) => {
@@ -100,7 +107,7 @@ export default function HeaderControls({
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      setChannelOpen(v => !v);
+      togglePicker();
     }
   };
 
@@ -146,7 +153,7 @@ export default function HeaderControls({
             aria-haspopup="listbox"
             aria-expanded={channelOpen}
             aria-label="Select voice channel"
-            onClick={() => setChannelOpen(v => !v)}
+            onClick={togglePicker}
             onKeyDown={onTriggerKeyDown}
           >
             <span className="channel-trigger-text">

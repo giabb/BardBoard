@@ -106,7 +106,7 @@ That's it. No coding required.
 
 If you change `BOT_PORT`, `WEB_PORT`, or `BACKEND_URL`, rebuild with `docker compose up --build -d` so the web proxy config is regenerated.
 
-You should see the BardBoard interface. If your voice channel ID is set correctly and the bot is in your server, you're all set! 🎉
+You should see the BardBoard interface. If the bot is in your server and you select a voice channel from the header, you're all set! 🎉
 
 ### Optional — Run Locally (without Docker)
 
@@ -208,7 +208,7 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 
 **Nothing is playing when I tap a button**
 - Make sure the bot is in your Discord server and has the **Connect** and **Speak** permissions in the voice channel
-- Check that `CHANNEL_ID` in your `.env` file matches the voice channel you want the bot to join
+- Select a voice channel from the channel dropdown in the app header
 
 **The soundboard is empty**
 - Make sure there are audio files in the `audio-files/` folder
@@ -241,7 +241,6 @@ If you want to tweak behavior, auth, network, and limits, these env vars are ava
 
 **Required Discord Settings**
 - `DISCORD_TOKEN` — Your bot token (required).
-- `CHANNEL_ID` — Voice channel ID (required).
 
 **Auth and Session Settings**
 - `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
@@ -285,8 +284,7 @@ If you want to tweak behavior, auth, network, and limits, these env vars are ava
 
 Here's what's on the horizon for BardBoard:
 
-- [ ] 💬 **Discord slash commands** — Play sounds with `/play` directly in chat, in addition to the web UI
-- [ ] 🌐 **Multi-channel support** — Run separate soundboards for different voice channels at the same time
+- [ ] 💬 **Discord slash commands** — Play sounds with `/play` directly in chat, in addition to the web UI (considering if actually makes sense to do it).
 - [ ] ✨ **Make things simpler** — I know the whole setup can be a lot for most of the users, so I hope to make things easier in the future! 
 
 ---
@@ -354,3 +352,5 @@ See the [LICENSE.md](LICENSE.md) file for complete details.
 [⭐ Star this repo](https://github.com/giabb/BardBoard) • [🐛 Report Issues](https://github.com/giabb/BardBoard/issues) • [💬 Discussions](https://github.com/giabb/BardBoard/discussions)
 
 </div>
+
+

@@ -84,7 +84,7 @@ export default function SoundboardClient() {
   const uploadCategoryPickerRef = useRef(null);
   const lastSentVolumeRef = useRef(50);
   const lastNonZeroVolumeRef = useRef(50);
-  const channelId = selectedChannelId || env?.channelId || '';
+  const channelId = selectedChannelId || '';
   const uploadMaxMb = Number(env?.uploadMaxMb) > 0 ? Number(env.uploadMaxMb) : 50;
 
   const fetchApi = useCallback(async (url, options = {}) => {
@@ -156,8 +156,7 @@ export default function SoundboardClient() {
         setAuthEnabled(Boolean(authData.authEnabled));
         const preferred = window.localStorage.getItem('bardboard.channelId') || '';
         const hasPreferred = channelsList.some(ch => ch.channelId === preferred);
-        const hasEnvDefault = channelsList.some(ch => ch.channelId === envData.channelId);
-        const fallback = hasEnvDefault ? envData.channelId : (channelsList[0]?.channelId || envData.channelId || '');
+        const fallback = channelsList[0]?.channelId || '';
         setSelectedChannelId(hasPreferred ? preferred : fallback);
       }
     })().catch(console.error);
@@ -197,8 +196,8 @@ export default function SoundboardClient() {
       if (!trigger) return;
 
       const rect = trigger.getBoundingClientRect();
-      const optionCount = Math.max(1, uploadCategoryOptions.length);
-      const estimatedMenuHeight = Math.min(220, (optionCount * 38) + 12) + 6;
+      const menu = picker?.querySelector('.field-select-menu');
+      const estimatedMenuHeight = Math.min(220, Number(menu?.scrollHeight || 220)) + 6;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
       setUploadCategoryMenuUp(spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow);
@@ -502,7 +501,7 @@ export default function SoundboardClient() {
     npRef.current = { ...npRef.current, elapsed: target };
     npPollRef.current = performance.now();
     await post('/api/seek', { channelId, offsetSecs: target });
-  }, [channelId, post, requireChannel]);
+  }, [channelId, post]);
 
   useEffect(() => {
     if (!seeking) return;

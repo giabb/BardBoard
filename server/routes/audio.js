@@ -17,7 +17,7 @@
 */
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { resolveAudioPath, hasAllowedExt } = require('../utils/path');
+const { normalizeAudioFileName, isValidChannelId } = require('../utils/validation');
 
 function createAudioRoutes(audioService) {
   const router = express.Router();
@@ -34,20 +34,6 @@ function createAudioRoutes(audioService) {
     legacyHeaders: false
   });
 
-  function isValidChannelId(channelId) {
-    return typeof channelId === 'string' && /^\d{17,20}$/.test(channelId);
-  }
-
-  function normalizeFileName(raw) {
-    if (!raw) return null;
-    const relPath = raw.toString().replace(/\\/g, '/');
-    if (relPath.includes('..') || relPath.startsWith('/')) return null;
-    if (!hasAllowedExt(relPath)) return null;
-    const fullPath = resolveAudioPath(relPath);
-    if (!fullPath) return null;
-    return relPath;
-  }
-
   router.get('/repeat-status', statusLimiter, (req, res) => {
     const { channelId } = req.query;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
@@ -57,7 +43,7 @@ function createAudioRoutes(audioService) {
   router.post('/play-audio', actionLimiter, (req, res) => {
     const { fileName, channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
-    const safeFile = normalizeFileName(fileName);
+    const safeFile = normalizeAudioFileName(fileName);
     if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
     audioService.playAudioInDiscord(safeFile, channelId);
     res.sendStatus(200);
