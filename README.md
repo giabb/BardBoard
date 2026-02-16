@@ -91,9 +91,10 @@ That's it. No coding required.
 
 1. Download or clone this repository to a folder on your computer
 2. Inside that folder, copy the file `.env.sample` and rename it to `.env`
-3. Open it and replace the values with your own Discord Bot Token and Voice Channel ID retrieved in Step 1 and 3.
+3. Open it and replace the values with your own Discord Bot Token.
 4. (Optional) Enable the login screen by setting:
-   - `AUTH_USER` / `AUTH_PASS` for the credentials
+   - `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASS` for admin credentials
+   - `AUTH_READONLY_USER` / `AUTH_READONLY_PASS` for standard user credentials
    - `SESSION_SECRET` to a long random string (32+ chars)
    - `SESSION_DIR` (optional) if you want to store sessions outside the container (Docker mounts `./sessions`)
 
@@ -219,7 +220,7 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 - Try restarting with `docker compose restart`
 
 **I don't see the login screen**
-- Make sure both `AUTH_USER` and `AUTH_PASS` are set (auth is off if either is empty)
+- Make sure `AUTH_ADMIN_USER` and `AUTH_ADMIN_PASS` are set (auth is off if both admin and readonly pairs are missing)
 - Restart the container after changing `.env`
 
 **I changed my sounds but they didn't update**
@@ -243,7 +244,8 @@ If you want to tweak behavior, auth, network, and limits, these env vars are ava
 - `DISCORD_TOKEN` — Your bot token (required).
 
 **Auth and Session Settings**
-- `AUTH_USER` / `AUTH_PASS` — Enable login when both are set.
+- `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASS` — Admin credentials.
+- `AUTH_READONLY_USER` / `AUTH_READONLY_PASS` — Optional standard-user credentials.
 - `SESSION_SECRET` — Set this to a long random value (32+ chars).
 - `LOGIN_REMEMBER_DAYS` (default `30`) — "Remember me" cookie duration in days.
 - `SESSION_DIR` (default `./sessions`) — Where session files are stored (mounted in Docker).

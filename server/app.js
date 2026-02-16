@@ -28,8 +28,9 @@ const createAudioRoutes = require('./routes/audio');
 const createPlaylistRoutes = require('./routes/playlist');
 const createFileRoutes = require('./routes/files');
 const openApiSpec = require('./docs/openapi');
+const { readCurrentConfig, validateInput, writeConfig } = require('./utils/envConfig');
 
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const app = express();
 const discordClient = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
@@ -42,10 +43,14 @@ function safeEqual(a, b) {
   return require('crypto').timingSafeEqual(aBuf, bBuf);
 }
 
-const authUser = process.env.AUTH_USER || '';
-const authPass = process.env.AUTH_PASS || '';
+const adminUser = process.env.AUTH_ADMIN_USER || '';
+const adminPass = process.env.AUTH_ADMIN_PASS || '';
+const userUser = process.env.AUTH_READONLY_USER || '';
+const userPass = process.env.AUTH_READONLY_PASS || '';
 const rememberDays = Math.max(1, Number.parseInt(process.env.LOGIN_REMEMBER_DAYS || '30', 10));
-const authEnabled = authUser && authPass;
+const adminConfigured = Boolean(adminUser && adminPass);
+const readonlyConfigured = Boolean(userUser && userPass);
+const authEnabled = adminConfigured || readonlyConfigured;
 const corsOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
@@ -129,6 +134,24 @@ function cleanupNonRememberSessions() {
   }
 }
 
+function purgeAllSessions() {
+  try {
+    if (!fs.existsSync(sessionDir)) return;
+    const files = fs.readdirSync(sessionDir);
+    for (const file of files) {
+      const fullPath = path.join(sessionDir, file);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile()) fs.unlinkSync(fullPath);
+      } catch {
+        // Ignore per-file errors during purge.
+      }
+    }
+  } catch (err) {
+    console.warn('Session purge skipped:', err.message);
+  }
+}
+
 app.use(helmet({ contentSecurityPolicy: false }));
 if (corsOrigins.length > 0) {
   app.use(cors({
@@ -158,16 +181,23 @@ app.post('/auth/login', (req, res) => {
 
   const username = (req.body.username || '').toString();
   const password = (req.body.password || '').toString();
-  if (!safeEqual(username, authUser) || !safeEqual(password, authPass)) {
+  let role = '';
+  if (adminConfigured && safeEqual(username, adminUser) && safeEqual(password, adminPass)) {
+    role = 'admin';
+  } else if (readonlyConfigured && safeEqual(username, userUser) && safeEqual(password, userPass)) {
+    role = 'user';
+  }
+  if (!role) {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
   req.session.authenticated = true;
+  req.session.role = role;
   req.session.remember = Boolean(req.body.remember);
   if (req.body.remember) {
     req.session.cookie.maxAge = rememberDays * 24 * 60 * 60 * 1000;
   }
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({ ok: true, role });
 });
 
 app.post('/auth/logout', (req, res) => {
@@ -177,9 +207,12 @@ app.post('/auth/logout', (req, res) => {
 });
 
 app.get('/auth/status', (req, res) => {
+  const role = req.session?.authenticated ? (req.session.role || 'user') : null;
   res.status(200).json({
     authEnabled: Boolean(authEnabled),
-    authenticated: Boolean(req.session && req.session.authenticated)
+    authenticated: Boolean(req.session && req.session.authenticated),
+    role,
+    canManageSettings: role === 'admin'
   });
 });
 
@@ -187,8 +220,16 @@ app.use((req, res, next) => {
   if (!authEnabled) return next();
   if (req.session && req.session.authenticated) return next();
   if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') return next();
+  if (req.path === '/health') return next();
   if (req.path === '/api-docs' || req.path === '/api-docs.json') return next();
   return res.status(401).json({ error: 'Unauthorized' });
+});
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/settings/')) return next();
+  const role = req.session?.role || '';
+  if (role === 'admin') return next();
+  return res.status(403).json({ error: 'Forbidden' });
 });
 
 app.get('/env-config', (req, res) => {
@@ -196,6 +237,63 @@ app.get('/env-config', (req, res) => {
   res.json({
     uploadMaxMb
   });
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.get('/settings/config', (_req, res) => {
+  const items = readCurrentConfig()
+    .filter(item => item.settingsEditable !== false)
+    .map(item => ({
+    key: item.key,
+    label: item.label,
+    description: item.description || '',
+    section: item.section,
+    secret: Boolean(item.secret),
+    type: item.type || 'string',
+    configured: Boolean(item.configured),
+    value: item.value
+    }));
+  res.json({ items });
+});
+
+app.post('/settings/config', (req, res) => {
+  const currentItems = readCurrentConfig();
+  const currentMap = new Map(currentItems.map(item => [item.key, item]));
+  const validated = validateInput(req.body?.values, currentItems);
+  if (validated.error) return res.status(400).json({ error: validated.error });
+
+  const changedKeys = writeConfig(validated.values || {});
+  const changedItems = changedKeys
+    .map(key => currentMap.get(key))
+    .filter(Boolean);
+  const botRestartRequired = changedItems.some(item => item.restartScope === 'bot' || item.restartScope === 'both');
+  const webRestartRequired = changedItems.some(item => item.restartScope === 'web' || item.restartScope === 'both');
+  const authKeys = new Set([
+    'AUTH_ADMIN_USER',
+    'AUTH_ADMIN_PASS',
+    'AUTH_READONLY_USER',
+    'AUTH_READONLY_PASS'
+  ]);
+  const authChanged = changedKeys.some(key => authKeys.has(key));
+
+  return res.json({
+    ok: true,
+    changedKeys,
+    authChanged,
+    botRestartRequired,
+    webRestartRequired
+  });
+});
+
+app.post('/settings/restart', (req, res) => {
+  if (req.body?.purgeSessions) purgeAllSessions();
+  res.json({ ok: true, restarting: true });
+  setTimeout(() => {
+    process.exit(0);
+  }, 200);
 });
 
 app.get('/voice-channels', (_req, res) => {
