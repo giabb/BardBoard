@@ -25,15 +25,18 @@ const openApiSpec = {
     version: rootPackageJson.version,
     description: 'HTTP API used by the BardBoard Next.js frontend.'
   },
-  servers: [{ url: '/' }],
-  tags: [
-    { name: 'system', description: 'App configuration and service metadata' },
-    { name: 'settings', description: 'Environment configuration management' },
-    { name: 'audio', description: 'Playback controls and now-playing state' },
-    { name: 'playlist', description: 'Queue management and playback flow' },
-    { name: 'files', description: 'Audio library upload/list/delete operations' },
-    { name: 'auth', description: 'Session login/logout endpoints' }
+  servers: [
+    { url: '/api', description: 'Via Next.js proxy (WEB_PORT)' },
   ],
+  tags: [
+    { name: 'auth', description: 'Session login/logout endpoints' },
+    { name: 'audio', description: 'Playback controls and now-playing state' },
+    { name: 'files', description: 'Audio library upload/list/delete operations' },
+    { name: 'playlist', description: 'Queue management and playback flow' },
+    { name: 'settings', description: 'Environment configuration management' },
+    { name: 'system', description: 'App configuration and service metadata' }
+  ],
+  security: [{ sessionAuth: [] }],
   paths: {
     '/env-config': {
       get: {
@@ -60,6 +63,7 @@ const openApiSpec = {
       post: {
         tags: ['auth'],
         summary: 'Create authenticated session',
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -86,6 +90,7 @@ const openApiSpec = {
       post: {
         tags: ['auth'],
         summary: 'Destroy active session',
+        security: [],
         responses: { 200: { description: 'Session destroyed' } }
       }
     },
@@ -93,6 +98,7 @@ const openApiSpec = {
       get: {
         tags: ['auth'],
         summary: 'Read auth mode and current session state',
+        security: [],
         responses: {
           200: {
             description: 'Auth status payload',
@@ -182,6 +188,7 @@ const openApiSpec = {
       get: {
         tags: ['system'],
         summary: 'Service health probe',
+        security: [],
         responses: {
           200: {
             description: 'Healthy',
@@ -202,7 +209,8 @@ const openApiSpec = {
         tags: ['settings'],
         summary: 'Read editable environment settings',
         responses: {
-          200: { description: 'Settings list' }
+          200: { description: 'Settings list' },
+          403: { description: 'Forbidden (admin role required)' }
         }
       },
       post: {
@@ -226,7 +234,8 @@ const openApiSpec = {
         },
         responses: {
           200: { description: 'Saved' },
-          400: { description: 'Validation error' }
+          400: { description: 'Validation error' },
+          403: { description: 'Forbidden (admin role required)' }
         }
       }
     },
@@ -234,8 +243,22 @@ const openApiSpec = {
       post: {
         tags: ['settings'],
         summary: 'Restart backend process',
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  purgeSessions: { type: 'boolean', description: 'If true, purge all persisted sessions before restart.' }
+                }
+              }
+            }
+          }
+        },
         responses: {
-          200: { description: 'Restart requested' }
+          200: { description: 'Restart requested' },
+          403: { description: 'Forbidden (admin role required)' }
         }
       }
     },
@@ -616,6 +639,14 @@ const openApiSpec = {
     }
   },
   components: {
+    securitySchemes: {
+      sessionAuth: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'connect.sid',
+        description: 'Session cookie returned by /auth/login'
+      }
+    },
     parameters: {
       ChannelIdQuery: {
         in: 'query',

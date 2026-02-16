@@ -221,7 +221,7 @@ app.use((req, res, next) => {
   if (req.session && req.session.authenticated) return next();
   if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') return next();
   if (req.path === '/health') return next();
-  if (req.path === '/api-docs' || req.path === '/api-docs.json') return next();
+  if (req.path === '/api-docs') return res.redirect('/login');
   return res.status(401).json({ error: 'Unauthorized' });
 });
 
@@ -349,7 +349,22 @@ app.get('/api-docs', (_req, res) => {
       deepLinking: true,
       presets: [SwaggerUIBundle.presets.apis],
       layout: 'BaseLayout',
-      tagsSorter: 'alpha'
+      tagsSorter: 'alpha',
+      operationsSorter: (a, b) => {
+        const methodOrder = { get: 0, post: 1, put: 2, delete: 3, patch: 4, options: 5, head: 6 };
+        const aMethod = String(a.get('method') || '').toLowerCase();
+        const bMethod = String(b.get('method') || '').toLowerCase();
+        const aRank = Object.prototype.hasOwnProperty.call(methodOrder, aMethod) ? methodOrder[aMethod] : 999;
+        const bRank = Object.prototype.hasOwnProperty.call(methodOrder, bMethod) ? methodOrder[bMethod] : 999;
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aPath = String(a.get('path') || '');
+        const bPath = String(b.get('path') || '');
+        const pathCmp = aPath.localeCompare(bPath);
+        if (pathCmp !== 0) return pathCmp;
+
+        return aMethod.localeCompare(bMethod);
+      }
     });
   </script>
 </body>

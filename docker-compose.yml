@@ -45,8 +45,6 @@ services:
       - .env
     environment:
       - BOT_PORT=${BOT_PORT:-3001}
-    ports:
-      - "${BOT_PORT:-3001}:${BOT_PORT:-3001}"
     volumes:
       - ./audio-files:/usr/src/app/audio-files
       - ${SESSION_DIR:-./sessions}:/usr/src/app/sessions
