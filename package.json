@@ -3,6 +3,7 @@
   "version": "2.3.0",
   "main": "server/app.js",
   "scripts": {
+    "setup:env": "node scripts/setup-env.js",
     "dev": "concurrently -k \"npm:dev:bot\" \"npm:dev:web\"",
     "dev:bot": "node server/app.js",
     "dev:web": "next dev",

@@ -85,8 +85,12 @@ That's it. No coding required.
 ### Step 3 — Download and Configure BardBoard
 
 1. Download or clone this repository to a folder on your computer
-2. Inside that folder, copy the file `.env.sample` and rename it to `.env`
-3. Open it and replace the values with your own Discord Bot Token.
+2. Run one guided setup wizard option:
+   - Docker-only (no npm/node needed):
+     - Windows (CMD/PowerShell): `setup-env-docker.bat`
+     - Linux/macOS: `sh setup-env-docker.sh`
+   - Node/npm installed: `npm run setup:env`
+3. (Alternative manual setup) copy `.env.sample` to `.env` and edit it directly.
 4. (Optional) Enable the login screen by setting:
    - `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASS` for admin credentials
    - `AUTH_READONLY_USER` / `AUTH_READONLY_PASS` for standard user credentials
@@ -346,5 +350,3 @@ See the [LICENSE.md](LICENSE.md) file for complete details.
 [⭐ Star this repo](https://github.com/giabb/BardBoard) • [🐛 Report Issues](https://github.com/giabb/BardBoard/issues) • [💬 Discussions](https://github.com/giabb/BardBoard/discussions)
 
 </div>
-
-
