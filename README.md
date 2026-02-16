@@ -82,12 +82,7 @@ That's it. No coding required.
 4. Copy the URL at the bottom and open it in your browser
 5. Pick your server and click **Authorize**
 
-### Step 3 — Find Your Voice Channel ID
-
-1. Enable [Developer Mode](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID#h_01HRSTXPS5CRSRTWYCGPHZQ37H)
-2. Retrieve your [Channel ID](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID#h_01HRSTXPS5FMK2A5SMVSX4JW4E)
-
-### Step 4 — Download and Configure BardBoard
+### Step 3 — Download and Configure BardBoard
 
 1. Download or clone this repository to a folder on your computer
 2. Inside that folder, copy the file `.env.sample` and rename it to `.env`
@@ -98,7 +93,7 @@ That's it. No coding required.
    - `SESSION_SECRET` to a long random string (32+ chars)
    - `SESSION_DIR` (optional) if you want to store sessions outside the container (Docker mounts `./sessions`)
 
-### Step 5 — Start It Up (With Docker)
+### Step 4 — Start It Up (With Docker)
 
 1. Open a terminal (or PowerShell on Windows) in the BardBoard folder
 2. Run this single command: `docker compose up --build -d`
@@ -158,6 +153,7 @@ This would give you a soundboard with a few loose sounds at the top, then a **Co
 The categories can be collapsed and expanded, and each category has its own colour!
 You can also delete songs or entire categories directly from the web UI (with a confirmation prompt).
 You can drag songs between categories to move the underlying file on disk, including moving songs back to the root (no category).
+You can create categories in two ways: the **Add Category** button, or by dragging a song to the **+ New Category** drop zone that appears during drag.
 
 ---
 
@@ -168,11 +164,12 @@ Open `http://localhost:<WEB_PORT>` in any browser on your network (default **htt
 ### The Soundboard
 
 The main area of the page is your soundboard — a grid of buttons, one per sound, optionally divided by categories. Just **tap or click** a button and it plays in your Discord voice channel immediately. The button for the currently playing sound lights up so you always know what's on.
-You can also drag a song onto another category to move it there.
+
 
 ### The Controls (top bar)
 
 - 🔊 **Volume slider** — Drag it left or right to adjust how loud the sound plays in Discord, then release to apply.
+- 🧭 **Channel selector** — Grouped by server. Picking a channel switches the bot connection to that channel.
 - 🔈 **Speaker icon (mute toggle)** — Click once to mute (set volume to 0), click again to restore your last non-zero volume.
 - ⏸️ **Pause / ▶️ Resume** — Tap this to pause the current sound and to enable resume button. Tap again to resume the song.
 - 🔁 **Repeat** — Tap this to loop the current sound. It'll keep playing on repeat until you stop it or play something else. Tap again to turn it off.
@@ -189,12 +186,6 @@ Below the playing bar, you can find a search bar. This bar filters songs and cat
 ### Add Song (Upload)
 
 Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one). The upload overlay shows a progress bar and percentage while files are being sent.
-
-### Add Categories
-
-You can create categories in two ways:
-- Click **Add Category** next to the search bar and type the category name.
-- Drag a track and drop it into the **+ New Category** zone (shown while dragging), then type the new category name to create it and move the track in one step.
 
 ### Playlist Panel
 
@@ -226,11 +217,14 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 - Try restarting with `docker compose restart`
 
 **I don't see the login screen**
-- Make sure `AUTH_ADMIN_USER` and `AUTH_ADMIN_PASS` are set (auth is off if both admin and readonly pairs are missing)
+- Make sure at least one full credential pair is set: `AUTH_ADMIN_USER` + `AUTH_ADMIN_PASS` or `AUTH_READONLY_USER` + `AUTH_READONLY_PASS` (auth is off if both pairs are missing)
 - Restart the container after changing `.env`
 
 **I changed my sounds but they didn't update**
 - The soundboard reads files live, so new files should appear on the next page refresh. If they don't, make sure the files are inside the `audio-files/` folder or a first level subfolder (not a subfolder of a subfolder and so on)
+
+**I changed login credentials in Settings and behavior changed**
+- Updating auth credentials can invalidate current sessions. Log in again with the new credentials.
 
 **Something else is wrong**
 - You can check what's happening behind the scenes by running `docker compose logs -f` in your terminal — it'll show you any error messages from the bot
@@ -245,43 +239,35 @@ The soundboard works on phones and tablets too. The progress bar supports touch 
 ## ⚙️ Advanced Configuration
 
 If you want to tweak behavior, auth, network, and limits, these env vars are available:
+The **Settings** page is admin-only and only shows runtime-editable values.
 
-**Required Discord Settings**
-- `DISCORD_TOKEN` — Your bot token (required).
+| Variable | Required | Default | Description | Where to change | Apply method |
+|---|---|---|---|---|---|
+| **DISCORD_TOKEN** | Yes | - | Discord bot token. | Settings UI or .env | Restart |
+| **AUTH_ADMIN_USER** | No* | empty | Admin username. | Settings UI or .env | Restart |
+| **AUTH_ADMIN_PASS** | No* | empty | Admin password. | Settings UI or .env | Restart |
+| **AUTH_READONLY_USER** | No | empty | Optional readonly username. | Settings UI or .env | Restart |
+| **AUTH_READONLY_PASS** | No | empty | Optional readonly password. | Settings UI or .env | Restart |
+| **SESSION_SECRET** | Recommended | empty | Session signing secret (use 32+ chars). | Settings UI or .env | Restart |
+| **LOGIN_REMEMBER_DAYS** | No | 30 | "Remember me" duration in days. | Settings UI or .env | Restart |
+| **SESSION_DIR** | No | ./sessions | Session file storage directory. | Settings UI or .env | Restart |
+| **NOISES_FOLDER** | No | !noises | Category folder used for overlay noises. | Settings UI or .env | Restart |
+| **RATE_LIMIT_AUDIO** | No | 120 | Requests/minute for audio actions. | Settings UI or .env | Restart |
+| **RATE_LIMIT_FILES** | No | 60 | Requests/minute for file actions. | Settings UI or .env | Restart |
+| **RATE_LIMIT_AUDIO_STATUS** | No | 600 | Requests/minute for status polling. | Settings UI or .env | Restart |
+| **RATE_LIMIT_PLAYLIST** | No | 120 | Requests/minute for playlist actions. | Settings UI or .env | Restart |
+| **CORS_ORIGINS** | No | empty | Comma-separated allowed origins. | Settings UI or .env | Restart |
+| **SESSION_FILE_RETRIES** | No | 5 | Session file-store retry attempts. | Settings UI or .env | Restart |
+| **SESSION_FILE_RETRY_FACTOR** | No | 1 | Session file-store retry backoff factor. | Settings UI or .env | Restart |
+| **SESSION_FILE_RETRY_MIN_MS** | No | 50 | Session file-store min retry delay (ms). | Settings UI or .env | Restart |
+| **SESSION_FILE_RETRY_MAX_MS** | No | 200 | Session file-store max retry delay (ms). | Settings UI or .env | Restart |
+| **SESSION_WRITE_RETRIES** | No | 6 | Extra write retries for transient file-lock races. | Settings UI or .env | Restart |
+| **WEB_PORT** | No | 3000 | Web UI port. | .env only | docker compose up --build -d |
+| **BOT_PORT** | No | 3001 | Bot/API port. | .env only | docker compose up --build -d |
+| **BACKEND_URL** | No | http://localhost:3001 | Next.js API proxy target (set explicitly in .env; no variable expansion). | .env only | docker compose up --build -d |
+| **UPLOAD_MAX_MB** | No | 50 | Max upload size per file (MB). | .env only | docker compose up --build -d |
 
-**Auth and Session Settings**
-- `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASS` — Admin credentials.
-- `AUTH_READONLY_USER` / `AUTH_READONLY_PASS` — Optional standard-user credentials.
-- `SESSION_SECRET` — Set this to a long random value (32+ chars).
-- `LOGIN_REMEMBER_DAYS` (default `30`) — "Remember me" cookie duration in days.
-- `SESSION_DIR` (default `./sessions`) — Where session files are stored (mounted in Docker).
-
-**Audio File Behavior**
-- `NOISES_FOLDER` (default `!noises`) — Category folder name for overlay sounds.
-
-**Network and Ports**
-- `WEB_PORT` (default `3000`) — Port for the web UI.
-- `BOT_PORT` (default `3001`) — Port for the bot/API server.
-- `BACKEND_URL` (default `http://localhost:3001`) — Web proxy target for API requests (usually auto-set in Docker compose).
-- `BACKEND_URL` in `.env` is not expanded from other vars, so set it explicitly (for example `http://localhost:3001`).
-
-**Uploads and Rate Limit**
-- `UPLOAD_MAX_MB` (default `50`) — Max size (MB) per uploaded file.
-- `RATE_LIMIT_AUDIO` (default `120`) — Requests per minute for audio actions.
-- `RATE_LIMIT_FILES` (default `60`) — Requests per minute for file actions.
-- `RATE_LIMIT_AUDIO_STATUS` (default `600`) — Requests per minute for audio status polling.
-- `RATE_LIMIT_PLAYLIST` (default `120`) — Requests per minute for playlist actions.
-
-**CORS (Optional)**
-- `CORS_ORIGINS` — Comma-separated list of allowed origins (leave blank if UI and API are on the same host).
-
-**Session File Retry Tuning**
-- `SESSION_FILE_RETRIES` (default `5`) — File-store retry attempts.
-- `SESSION_FILE_RETRY_FACTOR` (default `1`) — Retry backoff factor.
-- `SESSION_FILE_RETRY_MIN_MS` (default `50`) — Minimum retry delay.
-- `SESSION_FILE_RETRY_MAX_MS` (default `200`) — Maximum retry delay.
-- `SESSION_WRITE_RETRIES` (default `6`) — Extra write retries for transient file-lock races.
-
+\*Auth is enabled when at least one complete credential pair is configured (AUTH_ADMIN_* and/or AUTH_READONLY_*).
 **Local (non-Docker) run**
 - `ffmpeg` must be installed and available in your PATH for seek to work.
 - Audio dependencies like `libsodium` are required for Discord voice support.
