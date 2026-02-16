@@ -28,6 +28,7 @@ const openApiSpec = {
   servers: [{ url: '/' }],
   tags: [
     { name: 'system', description: 'App configuration and service metadata' },
+    { name: 'settings', description: 'Environment configuration management' },
     { name: 'audio', description: 'Playback controls and now-playing state' },
     { name: 'playlist', description: 'Queue management and playback flow' },
     { name: 'files', description: 'Audio library upload/list/delete operations' },
@@ -101,7 +102,9 @@ const openApiSpec = {
                   type: 'object',
                   properties: {
                     authEnabled: { type: 'boolean' },
-                    authenticated: { type: 'boolean' }
+                    authenticated: { type: 'boolean' },
+                    role: { type: 'string', nullable: true, enum: ['admin', 'user', null] },
+                    canManageSettings: { type: 'boolean' }
                   }
                 }
               }
@@ -175,6 +178,67 @@ const openApiSpec = {
         }
       }
     },
+    '/health': {
+      get: {
+        tags: ['system'],
+        summary: 'Service health probe',
+        responses: {
+          200: {
+            description: 'Healthy',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { ok: { type: 'boolean' } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/settings/config': {
+      get: {
+        tags: ['settings'],
+        summary: 'Read editable environment settings',
+        responses: {
+          200: { description: 'Settings list' }
+        }
+      },
+      post: {
+        tags: ['settings'],
+        summary: 'Persist edited environment settings',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  values: {
+                    type: 'object',
+                    additionalProperties: { type: 'string' }
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Saved' },
+          400: { description: 'Validation error' }
+        }
+      }
+    },
+    '/settings/restart': {
+      post: {
+        tags: ['settings'],
+        summary: 'Restart backend process',
+        responses: {
+          200: { description: 'Restart requested' }
+        }
+      }
+    },
     '/voice-channels': {
       get: {
         tags: ['system'],
@@ -212,7 +276,8 @@ const openApiSpec = {
                 required: ['path'],
                 properties: {
                   path: { type: 'string', description: 'Relative source path, e.g. Category/Song.mp3' },
-                  targetCategory: { type: 'string', description: 'Target category name. Use empty string for root.' }
+                  targetCategory: { type: 'string', description: 'Target category name. Use empty string for root.' },
+                  createCategory: { type: 'boolean', description: 'Create target category if it does not exist.' }
                 }
               }
             }
@@ -228,6 +293,30 @@ const openApiSpec = {
       }
     },
     '/audio-category': {
+      post: {
+        tags: ['files'],
+        summary: 'Create an empty audio category',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name'],
+                properties: {
+                  name: { type: 'string', description: 'Category name' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Created' },
+          400: { description: 'Invalid category' },
+          409: { description: 'Category already exists' },
+          500: { description: 'Create category failed' }
+        }
+      },
       delete: {
         tags: ['files'],
         summary: 'Delete a whole audio category',

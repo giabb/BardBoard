@@ -190,6 +190,12 @@ Below the playing bar, you can find a search bar. This bar filters songs and cat
 
 Click **Add Song** next to the search bar to open the upload modal. You can drag multiple files, remove them before uploading, and choose a category (or create a new one). The upload overlay shows a progress bar and percentage while files are being sent.
 
+### Add Categories
+
+You can create categories in two ways:
+- Click **Add Category** next to the search bar and type the category name.
+- Drag a track and drop it into the **+ New Category** zone (shown while dragging), then type the new category name to create it and move the track in one step.
+
 ### Playlist Panel
 
 Use the playlist panel to manage queued tracks for your selected voice channel.

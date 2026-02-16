@@ -63,9 +63,7 @@ function createFileRoutes(audioService) {
           const subFiles = fs.readdirSync(subDirPath)
             .filter(f => hasAllowedExt(f))
             .map(f => `${entry.name}/${f}`);
-          if (subFiles.length > 0) {
-            response.categories[entry.name] = subFiles;
-          }
+          response.categories[entry.name] = subFiles;
         } catch (err) {
           console.error(`Error reading subdir ${entry.name}:`, err);
         }
@@ -148,6 +146,7 @@ function createFileRoutes(audioService) {
     const rawTargetCategory = req.body?.targetCategory;
     const targetCategoryInput = rawTargetCategory == null ? '' : rawTargetCategory.toString();
     const targetCategory = sanitizeCategory(targetCategoryInput);
+    const createCategory = Boolean(req.body?.createCategory);
     if (targetCategoryInput.trim() && !targetCategory) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -171,6 +170,10 @@ function createFileRoutes(audioService) {
       const sourceStat = fs.statSync(sourceFullPath);
       if (!sourceStat.isFile()) return res.status(400).json({ error: 'Not a file' });
 
+      if (targetCategory && createCategory && !fs.existsSync(targetDirPath)) {
+        fs.mkdirSync(targetDirPath, { recursive: false });
+      }
+
       const targetDirStat = fs.statSync(targetDirPath);
       if (!targetDirStat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
 
@@ -187,6 +190,33 @@ function createFileRoutes(audioService) {
       }
       console.error('Move file failed:', err);
       return res.status(500).json({ error: 'Move failed' });
+    }
+  });
+
+  /**
+   * Handles the `/audio-category` API endpoint to create a category folder.
+   *
+   * @route POST /audio-category
+   * @body {string} name - Category folder name.
+   */
+  router.post('/audio-category', (req, res) => {
+    const rawName = req.body?.name;
+    const input = rawName == null ? '' : rawName.toString();
+    const name = sanitizeCategory(input);
+    if (!name || !input.trim()) return res.status(400).json({ error: 'Invalid category' });
+    if (name !== input.trim()) return res.status(400).json({ error: 'Invalid category' });
+
+    const dirPath = resolveAudioPath(name);
+    if (!dirPath || dirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid category' });
+    if (fs.existsSync(dirPath)) return res.status(409).json({ error: 'Category already exists' });
+
+    try {
+      fs.mkdirSync(dirPath, { recursive: false });
+      return res.json({ ok: true, name });
+    } catch (err) {
+      if (err && err.code === 'EEXIST') return res.status(409).json({ error: 'Category already exists' });
+      console.error('Create category failed:', err);
+      return res.status(500).json({ error: 'Create category failed' });
     }
   });
 
