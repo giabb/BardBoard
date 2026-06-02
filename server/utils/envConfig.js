@@ -17,6 +17,7 @@
 */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const CONFIG_FIELDS = [
   { key: 'DISCORD_TOKEN', label: 'Discord Token', section: 'Required Discord Settings', description: 'Bot token from the Discord Developer Portal.', secret: true, restartScope: 'bot' },
@@ -47,9 +48,41 @@ const CONFIG_FIELDS = [
 const EDITABLE_CONFIG_KEYS = new Set(CONFIG_FIELDS
   .filter(field => field.settingsEditable !== false)
   .map(field => field.key));
+const REQUIRED_FIRST_BOOT_KEYS = ['DISCORD_TOKEN', 'AUTH_ADMIN_USER', 'AUTH_ADMIN_PASS'];
+const DEFAULT_CONFIG_VALUES = {
+  AUTH_READONLY_USER: '',
+  AUTH_READONLY_PASS: '',
+  AUTH_ADMIN_USER: '',
+  AUTH_ADMIN_PASS: '',
+  LOGIN_REMEMBER_DAYS: '30',
+  SESSION_DIR: './sessions',
+  NOISES_FOLDER: '!noises',
+  WEB_PORT: '3000',
+  BOT_PORT: '3001',
+  BACKEND_URL: 'http://localhost:3001',
+  UPLOAD_MAX_MB: '50',
+  RATE_LIMIT_AUDIO: '120',
+  RATE_LIMIT_FILES: '60',
+  RATE_LIMIT_AUDIO_STATUS: '600',
+  RATE_LIMIT_PLAYLIST: '120',
+  CORS_ORIGINS: '',
+  SESSION_FILE_RETRIES: '5',
+  SESSION_FILE_RETRY_FACTOR: '1',
+  SESSION_FILE_RETRY_MIN_MS: '50',
+  SESSION_FILE_RETRY_MAX_MS: '200',
+  SESSION_WRITE_RETRIES: '6'
+};
 
 function getEnvFilePath() {
-  return path.join(__dirname, '..', '..', '.env');
+  const explicitEnvPath = String(process.env.BARDBOARD_ENV_PATH || '').trim();
+  if (explicitEnvPath) {
+    return path.resolve(explicitEnvPath);
+  }
+  return path.join(process.cwd(), '.env');
+}
+
+function generateSessionSecret() {
+  return crypto.randomBytes(32).toString('hex');
 }
 
 function unquote(raw) {
@@ -80,6 +113,76 @@ function parseEnvLines(rawText) {
     values[key] = unquote(match[2]);
   }
   return { lines, values };
+}
+
+function defaultFromProcess(key, fallback) {
+  if (Object.prototype.hasOwnProperty.call(process.env, key)) {
+    return String(process.env[key] ?? '');
+  }
+  return fallback;
+}
+
+function getEffectiveDefaults() {
+  return {
+    DISCORD_TOKEN: defaultFromProcess('DISCORD_TOKEN', ''),
+    SESSION_SECRET: defaultFromProcess('SESSION_SECRET', generateSessionSecret()),
+    ...Object.fromEntries(Object.entries(DEFAULT_CONFIG_VALUES).map(([key, value]) => [key, defaultFromProcess(key, value)]))
+  };
+}
+
+function ensureEnvFile() {
+  const envPath = getEnvFilePath();
+  const defaults = getEffectiveDefaults();
+  const before = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+  const parsed = parseEnvLines(before);
+
+  const values = { ...parsed.values };
+  let changed = false;
+
+  for (const key of REQUIRED_FIRST_BOOT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(values, key)) {
+      values[key] = defaults[key] || '';
+      changed = true;
+    }
+  }
+
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!Object.prototype.hasOwnProperty.call(values, key)) {
+      values[key] = value;
+      changed = true;
+    }
+  }
+
+  if (!fs.existsSync(envPath) || changed) {
+    const orderedKeys = [];
+    const seen = new Set();
+    CONFIG_FIELDS.forEach(field => {
+      if (!seen.has(field.key)) {
+        orderedKeys.push(field.key);
+        seen.add(field.key);
+      }
+    });
+    Object.keys(values).forEach(key => {
+      if (!seen.has(key)) {
+        orderedKeys.push(key);
+        seen.add(key);
+      }
+    });
+
+    const lines = orderedKeys.map(key => `${key}=${quoteIfNeeded(values[key] ?? '')}`);
+    const normalized = `${lines.join('\n')}\n`;
+    fs.writeFileSync(envPath, normalized, 'utf8');
+  }
+}
+
+function isConfiguredForFirstBoot(values) {
+  const discordToken = String(values.DISCORD_TOKEN || '').trim();
+  const adminUser = String(values.AUTH_ADMIN_USER || '').trim();
+  const adminPass = String(values.AUTH_ADMIN_PASS || '').trim();
+  if (!discordToken || /pasteyourdiscordbottokenhere/i.test(discordToken)) return false;
+  if (!adminUser) return false;
+  if (!adminPass) return false;
+  return true;
 }
 
 function readCurrentConfig() {
@@ -168,6 +271,10 @@ function writeConfig(updatedValues) {
 
 module.exports = {
   CONFIG_FIELDS,
+  DEFAULT_CONFIG_VALUES,
+  ensureEnvFile,
+  getEnvFilePath,
+  isConfiguredForFirstBoot,
   readCurrentConfig,
   validateInput,
   writeConfig

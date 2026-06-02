@@ -28,9 +28,9 @@ const createAudioRoutes = require('./routes/audio');
 const createPlaylistRoutes = require('./routes/playlist');
 const createFileRoutes = require('./routes/files');
 const openApiSpec = require('./docs/openapi');
-const { readCurrentConfig, validateInput, writeConfig } = require('./utils/envConfig');
-
-require('dotenv').config({ override: true });
+const { ensureEnvFile, getEnvFilePath, readCurrentConfig, validateInput, writeConfig, isConfiguredForFirstBoot } = require('./utils/envConfig');
+ensureEnvFile();
+require('dotenv').config({ path: getEnvFilePath(), override: true });
 
 const app = express();
 const discordClient = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
@@ -43,14 +43,6 @@ function safeEqual(a, b) {
   return require('crypto').timingSafeEqual(aBuf, bBuf);
 }
 
-const adminUser = process.env.AUTH_ADMIN_USER || '';
-const adminPass = process.env.AUTH_ADMIN_PASS || '';
-const userUser = process.env.AUTH_READONLY_USER || '';
-const userPass = process.env.AUTH_READONLY_PASS || '';
-const rememberDays = Math.max(1, Number.parseInt(process.env.LOGIN_REMEMBER_DAYS || '30', 10));
-const adminConfigured = Boolean(adminUser && adminPass);
-const readonlyConfigured = Boolean(userUser && userPass);
-const authEnabled = adminConfigured || readonlyConfigured;
 const corsOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
@@ -111,6 +103,35 @@ function withMissingSessionAsEmpty(store) {
 withFsRetry(sessionStore, 'set');
 withFsRetry(sessionStore, 'touch');
 withMissingSessionAsEmpty(sessionStore);
+
+function isSetupRequiredNow() {
+  const currentItems = readCurrentConfig();
+  const values = {};
+  currentItems.forEach(item => {
+    values[item.key] = item.value;
+  });
+  return !isConfiguredForFirstBoot(values);
+}
+
+function getAuthConfig() {
+  const adminUser = process.env.AUTH_ADMIN_USER || '';
+  const adminPass = process.env.AUTH_ADMIN_PASS || '';
+  const userUser = process.env.AUTH_READONLY_USER || '';
+  const userPass = process.env.AUTH_READONLY_PASS || '';
+  const rememberDays = Math.max(1, Number.parseInt(process.env.LOGIN_REMEMBER_DAYS || '30', 10));
+  const adminConfigured = Boolean(adminUser && adminPass);
+  const readonlyConfigured = Boolean(userUser && userPass);
+  return {
+    adminUser,
+    adminPass,
+    userUser,
+    userPass,
+    rememberDays,
+    adminConfigured,
+    readonlyConfigured,
+    authEnabled: adminConfigured || readonlyConfigured
+  };
+}
 
 function cleanupNonRememberSessions() {
   try {
@@ -176,15 +197,58 @@ app.use(session({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+app.get('/setup/status', (_req, res) => {
+  res.status(200).json({ setupRequired: isSetupRequiredNow() });
+});
+
+app.post('/setup/complete', (req, res) => {
+  if (!isSetupRequiredNow()) return res.status(409).json({ error: 'Setup already completed' });
+
+  const discordToken = String(req.body?.discordToken || '').trim();
+  const adminUserInput = String(req.body?.adminUser || '').trim();
+  const adminPassInput = String(req.body?.adminPass || '');
+  const readonlyEnabled = Boolean(req.body?.readonlyEnabled);
+  const readonlyUserInput = String(req.body?.readonlyUser || '').trim();
+  const readonlyPassInput = String(req.body?.readonlyPass || '');
+
+  if (!discordToken || /pasteyourdiscordbottokenhere/i.test(discordToken)) {
+    return res.status(400).json({ error: 'Discord token is required' });
+  }
+  if (!adminUserInput) return res.status(400).json({ error: 'Admin username is required' });
+  if (!adminPassInput) return res.status(400).json({ error: 'Admin password is required' });
+  if (readonlyEnabled && (!readonlyUserInput || !readonlyPassInput)) {
+    return res.status(400).json({ error: 'Readonly credentials must include both username and password' });
+  }
+
+  const changedKeys = writeConfig({
+    DISCORD_TOKEN: discordToken,
+    AUTH_ADMIN_USER: adminUserInput,
+    AUTH_ADMIN_PASS: adminPassInput,
+    AUTH_READONLY_USER: readonlyEnabled ? readonlyUserInput : '',
+    AUTH_READONLY_PASS: readonlyEnabled ? readonlyPassInput : '',
+    BACKEND_URL: process.env.BACKEND_URL || `http://localhost:${process.env.BOT_PORT || '3001'}`
+  });
+
+  process.env.DISCORD_TOKEN = discordToken;
+  process.env.AUTH_ADMIN_USER = adminUserInput;
+  process.env.AUTH_ADMIN_PASS = adminPassInput;
+  process.env.AUTH_READONLY_USER = readonlyEnabled ? readonlyUserInput : '';
+  process.env.AUTH_READONLY_PASS = readonlyEnabled ? readonlyPassInput : '';
+  ensureDiscordLogin();
+
+  return res.status(200).json({ ok: true, changedKeys, restartRequired: true });
+});
+
 app.post('/auth/login', (req, res) => {
-  if (!authEnabled) return res.status(200).json({ ok: true });
+  const auth = getAuthConfig();
+  if (!auth.authEnabled) return res.status(200).json({ ok: true });
 
   const username = (req.body.username || '').toString();
   const password = (req.body.password || '').toString();
   let role = '';
-  if (adminConfigured && safeEqual(username, adminUser) && safeEqual(password, adminPass)) {
+  if (auth.adminConfigured && safeEqual(username, auth.adminUser) && safeEqual(password, auth.adminPass)) {
     role = 'admin';
-  } else if (readonlyConfigured && safeEqual(username, userUser) && safeEqual(password, userPass)) {
+  } else if (auth.readonlyConfigured && safeEqual(username, auth.userUser) && safeEqual(password, auth.userPass)) {
     role = 'user';
   }
   if (!role) {
@@ -195,7 +259,7 @@ app.post('/auth/login', (req, res) => {
   req.session.role = role;
   req.session.remember = Boolean(req.body.remember);
   if (req.body.remember) {
-    req.session.cookie.maxAge = rememberDays * 24 * 60 * 60 * 1000;
+    req.session.cookie.maxAge = auth.rememberDays * 24 * 60 * 60 * 1000;
   }
   return res.status(200).json({ ok: true, role });
 });
@@ -207,9 +271,11 @@ app.post('/auth/logout', (req, res) => {
 });
 
 app.get('/auth/status', (req, res) => {
+  const auth = getAuthConfig();
   const role = req.session?.authenticated ? (req.session.role || 'user') : null;
   res.status(200).json({
-    authEnabled: Boolean(authEnabled),
+    setupRequired: isSetupRequiredNow(),
+    authEnabled: Boolean(auth.authEnabled),
     authenticated: Boolean(req.session && req.session.authenticated),
     role,
     canManageSettings: role === 'admin'
@@ -217,7 +283,14 @@ app.get('/auth/status', (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (!authEnabled) return next();
+  const auth = getAuthConfig();
+  if (isSetupRequiredNow()) {
+    if (req.path === '/setup/status' || req.path === '/setup/complete') return next();
+    if (req.path === '/health') return next();
+    if (req.path === '/auth/status') return next();
+    return res.status(503).json({ error: 'Initial setup required', setupRequired: true });
+  }
+  if (!auth.authEnabled) return next();
   if (req.session && req.session.authenticated) return next();
   if (req.path === '/auth/login' || req.path === '/auth/logout' || req.path === '/auth/status') return next();
   if (req.path === '/health') return next();
@@ -226,7 +299,9 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  const auth = getAuthConfig();
   if (!req.path.startsWith('/settings/')) return next();
+  if (req.path === '/settings/restart' && (!auth.authEnabled || isSetupRequiredNow())) return next();
   const role = req.session?.role || '';
   if (role === 'admin') return next();
   return res.status(403).json({ error: 'Forbidden' });
@@ -290,7 +365,9 @@ app.post('/settings/config', (req, res) => {
 
 app.post('/settings/restart', (req, res) => {
   if (req.body?.purgeSessions) purgeAllSessions();
-  res.json({ ok: true, restarting: true });
+  const isDev = process.env.NODE_ENV !== 'production';
+  res.json({ ok: true, restarting: !isDev });
+  if (isDev) return;
   setTimeout(() => {
     process.exit(0);
   }, 200);
@@ -375,7 +452,26 @@ discordClient.on(Events.ClientReady, () => {
   console.log(`Logged in as ${discordClient.user.tag}!`);
 });
 
-discordClient.login(process.env.DISCORD_TOKEN);
+discordClient.on('error', err => {
+  console.error('Discord client error:', err?.message || err);
+});
+
+let discordLoginStarted = false;
+function ensureDiscordLogin() {
+  const discordToken = (process.env.DISCORD_TOKEN || '').trim();
+  if (!discordToken) {
+    console.warn('DISCORD_TOKEN not configured. API is running, but Discord features are disabled.');
+    return;
+  }
+  if (discordLoginStarted) return;
+  discordLoginStarted = true;
+  discordClient.login(discordToken).catch(err => {
+    discordLoginStarted = false;
+    console.error('Discord login failed. API is running, but Discord features are disabled.');
+    console.error(err?.message || err);
+  });
+}
+ensureDiscordLogin();
 
 const port = Number.parseInt(process.env.BOT_PORT || '3001', 10);
 app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));

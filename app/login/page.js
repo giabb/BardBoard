@@ -17,7 +17,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function AmbientBg() {
   return (
@@ -38,6 +38,23 @@ export default function LoginPage() {
   const [failed, setFailed] = useState(false);
   const failedFromQuery = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('error') === '1';
   const showError = failed || failedFromQuery;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/setup/status', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data?.setupRequired) {
+          window.location.href = '/setup';
+        }
+      } catch {
+        // Ignore startup races.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function onSubmit(event) {
     event.preventDefault();

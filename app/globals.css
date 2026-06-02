@@ -529,7 +529,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     position: relative;
     z-index: 1;
     flex: 1;
-    max-width: 1140px;
+    max-width: min(1760px, 96vw);
     width: 100%;
     margin: 0 auto;
     padding: 36px 24px 48px;
@@ -604,7 +604,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
    PLAYLIST PANEL
    ============================================= */
 .playlist-panel {
-    width: min(320px, 32vw);
+    width: clamp(280px, 22vw, 360px);
     position: sticky;
     top: 24px;
     align-self: flex-start;
@@ -887,6 +887,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     background: rgba(30, 22, 42, 0.6);
     cursor: pointer;
     transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+
+.upload-drop.is-active {
+    border-color: var(--gold-light);
+    background: rgba(212,168,67,0.12);
+    box-shadow: 0 0 22px rgba(212,168,67,0.18);
 }
 
 .drop-title {
@@ -1224,7 +1230,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
    ============================================= */
 .track-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 14px;
 }
 
@@ -1283,6 +1289,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 .track-delete {
+    position: relative;
     width: 28px;
     height: 28px;
     border-radius: 8px;
@@ -1297,6 +1304,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 .track-queue {
+    position: relative;
     width: 28px;
     height: 28px;
     border-radius: 8px;
@@ -1310,7 +1318,77 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
 }
 
+.track-rename {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.35);
+    color: #fcd34d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.track-actions button[data-tooltip]::before,
+.track-actions button[data-tooltip]::after {
+    position: absolute;
+    left: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -6px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    z-index: 5;
+}
+
+.track-actions button[data-tooltip]::before {
+    content: attr(data-tooltip);
+    bottom: calc(100% + 8px);
+    padding: 5px 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    background: rgba(15, 11, 22, 0.96);
+    color: var(--text-primary);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.track-actions button[data-tooltip]::after {
+    content: '';
+    bottom: calc(100% + 3px);
+    width: 8px;
+    height: 8px;
+    background: rgba(15, 11, 22, 0.96);
+    border-right: 1px solid rgba(255,255,255,0.12);
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    transform: translate(-50%, -6px) rotate(45deg);
+}
+
+.track-actions button[data-tooltip]:hover::before,
+.track-actions button[data-tooltip]:hover::after,
+.track-actions button[data-tooltip]:focus-visible::before,
+.track-actions button[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.track-actions button[data-tooltip]:hover::after,
+.track-actions button[data-tooltip]:focus-visible::after {
+    transform: translate(-50%, 0) rotate(45deg);
+}
+
 .track-queue svg {
+    width: 16px;
+    height: 16px;
+}
+
+.track-rename svg {
     width: 16px;
     height: 16px;
 }
@@ -1318,6 +1396,12 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 .track-queue:hover {
     background: rgba(34,197,94,0.25);
     box-shadow: 0 0 10px rgba(34,197,94,0.35);
+    transform: translateY(-1px);
+}
+
+.track-rename:hover {
+    background: rgba(251,191,36,0.25);
+    box-shadow: 0 0 10px rgba(251,191,36,0.35);
     transform: translateY(-1px);
 }
 
@@ -1406,7 +1490,7 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
 }
 
 .cat-delete {
-    margin-left: auto;
+    margin-left: 0;
     width: 30px;
     height: 30px;
     border-radius: 8px;
@@ -1421,14 +1505,100 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
 }
 
+.cat-rename {
+    margin-left: auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.3);
+    color: #fcd34d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
 .category-header:hover .cat-delete,
-.category-header:focus-within .cat-delete {
+.category-header:focus-within .cat-delete,
+.category-header:hover .cat-rename,
+.category-header:focus-within .cat-rename {
     opacity: 1;
+}
+
+.cat-rename,
+.cat-delete {
+    position: relative;
+}
+
+.category-header button[data-tooltip]::before,
+.category-header button[data-tooltip]::after {
+    position: absolute;
+    left: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -6px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    z-index: 6;
+}
+
+.category-header button[data-tooltip]::before {
+    content: attr(data-tooltip);
+    bottom: calc(100% + 8px);
+    padding: 5px 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    background: rgba(15, 11, 22, 0.96);
+    color: var(--text-primary);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    font-family: var(--font-raleway), sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.category-header button[data-tooltip]::after {
+    content: '';
+    bottom: calc(100% + 3px);
+    width: 8px;
+    height: 8px;
+    background: rgba(15, 11, 22, 0.96);
+    border-right: 1px solid rgba(255,255,255,0.12);
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    transform: translate(-50%, -6px) rotate(45deg);
+}
+
+.category-header button[data-tooltip]:hover::before,
+.category-header button[data-tooltip]:hover::after,
+.category-header button[data-tooltip]:focus-visible::before,
+.category-header button[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.category-header button[data-tooltip]:hover::after,
+.category-header button[data-tooltip]:focus-visible::after {
+    transform: translate(-50%, 0) rotate(45deg);
+}
+
+.cat-rename svg {
+    width: 16px;
+    height: 16px;
 }
 
 .cat-delete svg {
     width: 16px;
     height: 16px;
+}
+
+.cat-rename:hover {
+    background: rgba(251,191,36,0.28);
+    box-shadow: 0 0 10px rgba(251,191,36,0.35);
+    transform: translateY(-1px);
 }
 
 .cat-delete:hover {
@@ -1474,7 +1644,14 @@ a:hover { color: var(--gold-light); text-decoration: underline; }
     grid-template-rows: 0fr;
 }
 
-.category-inner { overflow: hidden; }
+.category-inner {
+    min-height: 0;
+    overflow: visible;
+}
+
+.category-wrapper.collapsed .category-inner {
+    overflow: hidden;
+}
 
 .cat-colored .track-btn::before {
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cat-color, var(--accent-violet)) 70%, transparent), transparent);

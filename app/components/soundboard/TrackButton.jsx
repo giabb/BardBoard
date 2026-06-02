@@ -18,7 +18,7 @@
 import { stripExt } from './utils';
 import TrashIcon from '../icons/TrashIcon';
 
-export default function TrackButton({ file, playing, onPlay, onQueue, onDelete, onDragStart, onDragEnd }) {
+export default function TrackButton({ file, playing, onPlay, onQueue, onRename, onDelete, onDragStart, onDragEnd }) {
   const display = stripExt(file.split('/').pop());
   return (
     <div
@@ -37,10 +37,13 @@ export default function TrackButton({ file, playing, onPlay, onQueue, onDelete, 
         <span className="track-label">{display}</span>
       </button>
       <div className="track-actions">
-        <button className="track-queue" type="button" onClick={e => { e.stopPropagation(); void onQueue(file); }} aria-label={`Queue ${display}`}>
+        <button className="track-queue" type="button" onClick={e => { e.stopPropagation(); void onQueue(file); }} aria-label={`Queue ${display}`} data-tooltip="Add to playlist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
         </button>
-        <button className="track-delete" type="button" onClick={e => { e.stopPropagation(); onDelete(file); }} aria-label={`Delete ${display}`}>
+        <button className="track-rename" type="button" onClick={e => { e.stopPropagation(); if (onRename) onRename(file); }} aria-label={`Rename ${display}`} data-tooltip="Rename">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+        </button>
+        <button className="track-delete" type="button" onClick={e => { e.stopPropagation(); onDelete(file); }} aria-label={`Delete ${display}`} data-tooltip="Delete">
           <TrashIcon />
         </button>
       </div>

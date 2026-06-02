@@ -194,6 +194,67 @@ function createFileRoutes(audioService) {
   });
 
   /**
+   * Handles the `/audio-file/rename` API endpoint to rename a file inside
+   * its current folder/category.
+   *
+   * @route POST /audio-file/rename
+   * @body {string} path - Relative source path like "Folder/File.mp3" or "File.mp3".
+   * @body {string} newName - New base name without extension.
+   */
+  router.post('/audio-file/rename', (req, res) => {
+    const rawPath = (req.body?.path || '').toString();
+    const sourceRelPath = rawPath.replace(/\\/g, '/');
+    if (!sourceRelPath || sourceRelPath.includes('..') || sourceRelPath.startsWith('/')) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+    if (!hasAllowedExt(sourceRelPath)) {
+      return res.status(400).json({ error: 'Invalid file type' });
+    }
+    if (audioService && typeof audioService.isFileInUse === 'function' && audioService.isFileInUse(sourceRelPath)) {
+      return res.status(409).json({ error: 'File is currently in use' });
+    }
+
+    const rawNewName = (req.body?.newName || '').toString();
+    const trimmedNewName = rawNewName.trim();
+    const sanitizedNewName = sanitizeCategory(trimmedNewName);
+    if (!trimmedNewName || !sanitizedNewName || sanitizedNewName !== trimmedNewName) {
+      return res.status(400).json({ error: 'Invalid file name' });
+    }
+
+    const sourceFullPath = resolveAudioPath(sourceRelPath);
+    if (!sourceFullPath) return res.status(400).json({ error: 'Invalid path' });
+
+    const sourceDir = path.posix.dirname(sourceRelPath);
+    const ext = path.extname(sourceRelPath);
+    const targetFileName = `${sanitizedNewName}${ext}`;
+    const targetRelPath = sourceDir === '.' ? targetFileName : `${sourceDir}/${targetFileName}`;
+    const targetFullPath = resolveAudioPath(targetRelPath);
+    if (!targetFullPath) return res.status(400).json({ error: 'Invalid target path' });
+    if (sourceFullPath === targetFullPath) {
+      return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: false });
+    }
+
+    try {
+      const sourceStat = fs.statSync(sourceFullPath);
+      if (!sourceStat.isFile()) return res.status(400).json({ error: 'Not a file' });
+
+      if (fs.existsSync(targetFullPath)) {
+        return res.status(409).json({ error: 'A file with the same name already exists' });
+      }
+
+      fs.renameSync(sourceFullPath, targetFullPath);
+      return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: true });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+      if (err && (err.code === 'EPERM' || err.code === 'EBUSY')) {
+        return res.status(409).json({ error: 'File is currently in use' });
+      }
+      console.error('Rename file failed:', err);
+      return res.status(500).json({ error: 'Rename failed' });
+    }
+  });
+
+  /**
    * Handles the `/audio-category` API endpoint to create a category folder.
    *
    * @route POST /audio-category
@@ -249,6 +310,51 @@ function createFileRoutes(audioService) {
       }
       console.error('Delete category failed:', err);
       return res.status(500).json({ error: 'Delete failed' });
+    }
+  });
+
+  /**
+   * Handles the `/audio-category/rename` API endpoint to rename a category folder.
+   *
+   * @route POST /audio-category/rename
+   * @body {string} name - Current category name.
+   * @body {string} newName - New category name.
+   */
+  router.post('/audio-category/rename', (req, res) => {
+    const rawName = (req.body?.name || '').toString();
+    const rawNewName = (req.body?.newName || '').toString();
+    const sourceName = sanitizeCategory(rawName.trim());
+    const targetName = sanitizeCategory(rawNewName.trim());
+    if (!sourceName || sourceName !== rawName.trim()) return res.status(400).json({ error: 'Invalid category' });
+    if (!targetName || targetName !== rawNewName.trim()) return res.status(400).json({ error: 'Invalid target category' });
+    if (sourceName === targetName) return res.json({ ok: true, from: sourceName, to: targetName, changed: false });
+
+    if (audioService && typeof audioService.isCategoryInUse === 'function' && audioService.isCategoryInUse(sourceName)) {
+      return res.status(409).json({ error: 'Category contains file(s) currently in use' });
+    }
+
+    const sourceDirPath = resolveAudioPath(sourceName);
+    const targetDirPath = resolveAudioPath(targetName);
+    if (!sourceDirPath || sourceDirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid category' });
+    if (!targetDirPath || targetDirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid target category' });
+
+    try {
+      const sourceStat = fs.statSync(sourceDirPath);
+      if (!sourceStat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
+
+      if (fs.existsSync(targetDirPath)) {
+        return res.status(409).json({ error: 'Category already exists' });
+      }
+
+      fs.renameSync(sourceDirPath, targetDirPath);
+      return res.json({ ok: true, from: sourceName, to: targetName, changed: true });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'Category not found' });
+      if (err && (err.code === 'EPERM' || err.code === 'EBUSY')) {
+        return res.status(409).json({ error: 'Category contains file(s) currently in use' });
+      }
+      console.error('Rename category failed:', err);
+      return res.status(500).json({ error: 'Rename failed' });
     }
   });
 
