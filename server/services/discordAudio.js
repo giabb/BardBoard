@@ -17,7 +17,14 @@
 */
 const path = require('path');
 const { spawn } = require('child_process');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType, NoSubscriberBehavior } = require('@discordjs/voice');
+const {
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  StreamType,
+  NoSubscriberBehavior,
+  AudioPlayerStatus
+} = require('@discordjs/voice');
 const sodium = require('libsodium-wrappers');
 const musicmetadata = require('music-metadata');
 const { AUDIO_DIR } = require('../constants');
@@ -31,7 +38,7 @@ function createDiscordAudioService(discordClient) {
   const currentVolume = new Map();
   const activeAudioResources = new Map();
   const activeTranscoders = new Map();
-  const playStartTime = new Map();
+  const playbackOffsets = new Map();
   const trackDurations = new Map();
   const pausedState = new Map();
   const pausedElapsed = new Map();
@@ -50,7 +57,7 @@ function createDiscordAudioService(discordClient) {
       activeAudioPlayers.delete(guildId);
       releasePlaybackHandles(guildId);
       currentAudioFile.delete(guildId);
-      playStartTime.delete(guildId);
+      playbackOffsets.delete(guildId);
       pausedState.delete(guildId);
       pausedElapsed.delete(guildId);
       playbackMode.delete(guildId);
@@ -83,6 +90,7 @@ function createDiscordAudioService(discordClient) {
       }
     }
     activeAudioResources.delete(guildId);
+    playbackOffsets.delete(guildId);
 
     const transcoder = activeTranscoders.get(guildId);
     if (transcoder) {
@@ -95,10 +103,43 @@ function createDiscordAudioService(discordClient) {
     }
   }
 
-  function setPlaybackResource(guildId, resource, transcoder = null) {
+  function setPlaybackResource(guildId, resource, transcoder = null, offsetSecs = 0) {
     releasePlaybackHandles(guildId);
     activeAudioResources.set(guildId, resource);
+    playbackOffsets.set(guildId, offsetSecs);
     if (transcoder) activeTranscoders.set(guildId, transcoder);
+  }
+
+  function waitForPlaybackStart(player, resource, timeoutMs = 5000) {
+    if (player.state.status === AudioPlayerStatus.Playing && player.state.resource === resource) {
+      return Promise.resolve();
+    }
+
+    return new Promise(resolve => {
+      let settled = false;
+      let timeout;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        player.off('stateChange', onStateChange);
+        player.off('error', finish);
+        resolve();
+      };
+
+      const onStateChange = (oldState, newState) => {
+        if (newState.status === AudioPlayerStatus.Playing && newState.resource === resource) {
+          finish();
+        } else if (newState.status === AudioPlayerStatus.Idle) {
+          finish();
+        }
+      };
+
+      player.on('stateChange', onStateChange);
+      player.once('error', finish);
+      timeout = setTimeout(finish, timeoutMs);
+    });
   }
 
   function getGuildId(channelId) {
@@ -160,12 +201,10 @@ function createDiscordAudioService(discordClient) {
   }
 
   function getElapsedSeconds(guildId) {
-    const isPaused = pausedState.get(guildId) || false;
-    if (isPaused) {
-      return pausedElapsed.get(guildId) || 0;
-    }
-    const startedAt = playStartTime.get(guildId) || Date.now();
-    return Math.max(0, (Date.now() - startedAt) / 1000);
+    const resource = activeAudioResources.get(guildId);
+    const offsetSecs = playbackOffsets.get(guildId) || 0;
+    const resourceElapsed = Number(resource?.playbackDuration) || 0;
+    return Math.max(0, offsetSecs + (resourceElapsed / 1000));
   }
 
   async function playNoiseOverCurrent(noiseFile, channel) {
@@ -203,12 +242,13 @@ function createDiscordAudioService(discordClient) {
     const volume = currentVolume.get(guildId) || 0.5;
     resource.volume.setVolume(volume);
 
-    setPlaybackResource(guildId, resource, ffmpeg);
-    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
+    setPlaybackResource(guildId, resource, ffmpeg, offsetSecs);
     pausedState.set(guildId, false);
     pausedElapsed.delete(guildId);
 
+    const playbackStarted = waitForPlaybackStart(player, resource);
     player.play(resource);
+    await playbackStarted;
     return true;
   }
 
@@ -334,13 +374,10 @@ function createDiscordAudioService(discordClient) {
       connection.subscribe(player);
       activeAudioPlayers.set(channel.guild.id, player);
       setPlaybackResource(channel.guild.id, resource);
-
-      playStartTime.set(channel.guild.id, Date.now());
       pausedState.set(channel.guild.id, false);
-      player.play(resource);
 
       player.on('stateChange', async (oldState, newState) => {
-        if (newState.status === 'idle') {
+        if (newState.status === AudioPlayerStatus.Idle) {
           const mode = playbackMode.get(channel.guild.id) || 'main';
           if (mode === 'noise') {
             cleanupPlayerOnly(channel.guild.id);
@@ -357,7 +394,6 @@ function createDiscordAudioService(discordClient) {
               const newResource = createAudioResource(repeatPath, { inlineVolume: true });
               newResource.volume.setVolume(currentVolume.get(channel.guild.id) || 0.5);
               setPlaybackResource(channel.guild.id, newResource);
-              playStartTime.set(channel.guild.id, Date.now());
               player.play(newResource);
             }
           } else {
@@ -368,6 +404,9 @@ function createDiscordAudioService(discordClient) {
         }
       });
 
+      const playbackStarted = waitForPlaybackStart(player, resource);
+      player.play(resource);
+      await playbackStarted;
       return true;
     } catch (error) {
       console.error('Error in playAudioInDiscord:', error);
@@ -385,17 +424,14 @@ function createDiscordAudioService(discordClient) {
     if (!player) return null;
 
     let paused = false;
-    if (player.state.status === 'playing') {
-      const startedAt = playStartTime.get(guildId) || Date.now();
-      const elapsed = (Date.now() - startedAt) / 1000;
+    if (player.state.status === AudioPlayerStatus.Playing) {
+      const elapsed = getElapsedSeconds(guildId);
       pausedElapsed.set(guildId, elapsed);
 
       player.pause();
       paused = true;
       pausedState.set(guildId, true);
-    } else if (player.state.status === 'paused') {
-      const elapsed = pausedElapsed.get(guildId) || 0;
-      playStartTime.set(guildId, Date.now() - (elapsed * 1000));
+    } else if (player.state.status === AudioPlayerStatus.Paused) {
       pausedElapsed.delete(guildId);
 
       player.unpause();
@@ -537,31 +573,33 @@ function createDiscordAudioService(discordClient) {
 
     resource.volume.setVolume(volume);
 
-    setPlaybackResource(guildId, resource, ffmpeg);
-    playStartTime.set(guildId, Date.now() - offsetSecs * 1000);
+    setPlaybackResource(guildId, resource, ffmpeg, offsetSecs);
 
     const isPaused = pausedState.get(guildId) || false;
     if (isPaused) {
       pausedElapsed.set(guildId, offsetSecs);
     }
 
+    const playbackStarted = waitForPlaybackStart(player, resource);
     player.play(resource);
+    await playbackStarted;
+    if (isPaused) player.pause();
     return true;
   }
 
   async function nowPlaying(channelId) {
     const channel = getChannel(channelId);
-    if (!channel) return { song: null, elapsed: 0, duration: 0, paused: false };
+    if (!channel) return { song: null, elapsed: 0, duration: 0, paused: false, playing: false };
 
     const guildId = channel.guild.id;
     const fileName = currentAudioFile.get(guildId) || null;
-    if (!fileName) return { song: null, elapsed: 0, duration: 0, paused: false };
+    if (!fileName) return { song: null, elapsed: 0, duration: 0, paused: false, playing: false };
 
     let duration = trackDurations.get(fileName);
     if (duration === undefined) {
       try {
         const safePath = resolveAudioPath(fileName);
-        if (!safePath) return { song: null, elapsed: 0, duration: 0, paused: false };
+        if (!safePath) return { song: null, elapsed: 0, duration: 0, paused: false, playing: false };
         const metadata = await musicmetadata.parseFile(safePath);
         duration = metadata.format.duration || 0;
       } catch {
@@ -575,15 +613,18 @@ function createDiscordAudioService(discordClient) {
     if (isPaused) {
       elapsed = pausedElapsed.get(guildId) || 0;
     } else {
-      const startedAt = playStartTime.get(guildId) || Date.now();
-      elapsed = Math.min((Date.now() - startedAt) / 1000, duration);
+      elapsed = Math.min(getElapsedSeconds(guildId), duration);
     }
+
+    const player = activeAudioPlayers.get(guildId);
+    const isActivelyPlaying = player?.state.status === AudioPlayerStatus.Playing;
 
     return {
       song: fileName.replace(/\.[^/.]+$/, ''),
       elapsed: Math.round(elapsed * 10) / 10,
       duration: Math.round(duration * 10) / 10,
-      paused: isPaused
+      paused: isPaused,
+      playing: isActivelyPlaying
     };
   }
 

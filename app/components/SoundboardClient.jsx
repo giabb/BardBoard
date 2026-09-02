@@ -58,7 +58,7 @@ export default function SoundboardClient() {
   const [volume, setVolume] = useState(50);
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [np, setNp] = useState({ song: null, elapsed: 0, duration: 0, paused: false });
+  const [np, setNp] = useState({ song: null, elapsed: 0, duration: 0, paused: false, playing: false });
   const [npElapsed, setNpElapsed] = useState(0);
   const [seeking, setSeeking] = useState(false);
   const [playlist, setPlaylist] = useState([]);
@@ -146,7 +146,13 @@ export default function SoundboardClient() {
     const res = await fetchApi('/api/now-playing?channelId=' + encodeURIComponent(channelId));
     if (!res.ok) return;
     const data = await parseJson(res);
-    const next = { song: data.song || null, elapsed: Number(data.elapsed) || 0, duration: Number(data.duration) || 0, paused: Boolean(data.paused) };
+    const next = {
+      song: data.song || null,
+      elapsed: Number(data.elapsed) || 0,
+      duration: Number(data.duration) || 0,
+      paused: Boolean(data.paused),
+      playing: Boolean(data.playing)
+    };
     const prevSong = npRef.current.song;
     npRef.current = next;
     npPollRef.current = performance.now();
@@ -261,7 +267,7 @@ export default function SoundboardClient() {
     const poll = window.setInterval(() => void updateNowPlaying(), 1000);
     const tick = window.setInterval(() => {
       const cur = npRef.current;
-      if (!cur.song || cur.paused) return;
+      if (!cur.song || cur.paused || !cur.playing) return;
       setNpElapsed(Math.min(cur.elapsed + ((performance.now() - npPollRef.current) / 1000), cur.duration || 0));
     }, 250);
     return () => { window.clearInterval(poll); window.clearInterval(tick); };

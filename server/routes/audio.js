@@ -40,12 +40,12 @@ function createAudioRoutes(audioService) {
     res.json(audioService.getRepeatStatus(channelId));
   });
 
-  router.post('/play-audio', actionLimiter, (req, res) => {
+  router.post('/play-audio', actionLimiter, async (req, res) => {
     const { fileName, channelId } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const safeFile = normalizeAudioFileName(fileName);
     if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
-    audioService.playAudioInDiscord(safeFile, channelId);
+    await audioService.playAudioInDiscord(safeFile, channelId);
     res.sendStatus(200);
   });
 
