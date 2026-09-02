@@ -194,6 +194,12 @@ function createDiscordAudioService(discordClient) {
     return raw.toString().trim().replace(/^\/+|\/+$/g, '') || '!noises';
   }
 
+  function getNoiseVolume() {
+    const configured = Number(process.env.NOISES_VOLUME || '2');
+    if (!Number.isFinite(configured)) return 2;
+    return Math.min(10, Math.max(0, configured));
+  }
+
   function isNoiseTrack(fileName) {
     const folder = getNoiseFolderName().toLowerCase();
     const normalized = fileName.replace(/\\/g, '/').toLowerCase();
@@ -218,11 +224,12 @@ function createDiscordAudioService(discordClient) {
     if (!noisePath || !mainPath) return false;
 
     const offsetSecs = getElapsedSeconds(guildId);
+    const noiseVolume = getNoiseVolume();
     const ffmpeg = spawn('ffmpeg', [
       '-ss', String(offsetSecs),
       '-i', mainPath,
       '-i', noisePath,
-      '-filter_complex', 'amix=inputs=2:duration=first:dropout_transition=0',
+      '-filter_complex', `[1:a]volume=${noiseVolume}[noise];[0:a][noise]amix=inputs=2:duration=first:dropout_transition=0:normalize=1,alimiter=limit=0.95:level=false`,
       '-f', 's16le',
       '-ar', '48000',
       '-ac', '2',

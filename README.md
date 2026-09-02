@@ -263,6 +263,7 @@ The setup page requires:
 | `LOGIN_REMEMBER_DAYS` | No | `30` | Remember-me cookie duration. | Restart |
 | `SESSION_DIR` | No | `./sessions` | Session file storage directory. | Restart |
 | `NOISES_FOLDER` | No | `!noises` | Category folder used for overlay noises. | Restart |
+| `NOISES_VOLUME` | No | `2` | Overlay noise gain (`1` = original level, `2` = double amplitude; range `0`-`10`). | Restart |
 | `RATE_LIMIT_AUDIO` | No | `120` | Requests/minute for audio actions. | Restart |
 | `RATE_LIMIT_FILES` | No | `60` | Requests/minute for file actions. | Restart |
 | `RATE_LIMIT_AUDIO_STATUS` | No | `600` | Requests/minute for status polling. | Restart |

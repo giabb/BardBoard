@@ -29,6 +29,7 @@ const CONFIG_FIELDS = [
   { key: 'LOGIN_REMEMBER_DAYS', label: 'Login Remember Days', section: 'Auth and Session Settings', description: 'Remember-me cookie duration in days.', type: 'integer', restartScope: 'bot' },
   { key: 'SESSION_DIR', label: 'Session Directory', section: 'Auth and Session Settings', description: 'Directory where session files are stored.', restartScope: 'bot' },
   { key: 'NOISES_FOLDER', label: 'Noises Folder', section: 'Audio File Behavior', description: 'Category folder name used for overlay noise tracks.', restartScope: 'bot' },
+  { key: 'NOISES_VOLUME', label: 'Noises Volume', section: 'Audio File Behavior', description: 'Overlay noise gain from 0 to 10. Use 1 for the original level or 2 to double the noise amplitude.', type: 'number', min: 0, max: 10, restartScope: 'bot' },
   { key: 'WEB_PORT', label: 'Web Port', section: 'Network and Ports', description: 'Port exposed by the Next.js web UI.', type: 'integer', restartScope: 'web', settingsEditable: false },
   { key: 'BOT_PORT', label: 'Bot/API Port', section: 'Network and Ports', description: 'Port exposed by the bot/API process.', type: 'integer', restartScope: 'bot', settingsEditable: false },
   { key: 'BACKEND_URL', label: 'Backend URL', section: 'Network and Ports', description: 'URL used by Next.js to proxy API requests.', restartScope: 'web', settingsEditable: false },
@@ -57,6 +58,7 @@ const DEFAULT_CONFIG_VALUES = {
   LOGIN_REMEMBER_DAYS: '30',
   SESSION_DIR: './sessions',
   NOISES_FOLDER: '!noises',
+  NOISES_VOLUME: '2',
   WEB_PORT: '3000',
   BOT_PORT: '3001',
   BACKEND_URL: 'http://localhost:3001',
@@ -219,6 +221,16 @@ function validateInput(inputValues, currentItems) {
       const parsed = Number.parseInt(value, 10);
       if (!Number.isFinite(parsed) || `${parsed}` !== value.trim() || parsed < 0) {
         return { error: `Invalid integer for ${key}` };
+      }
+    }
+
+    if (field?.type === 'number' && value.trim() !== '') {
+      const trimmed = value.trim();
+      const parsed = Number(trimmed);
+      const min = Number.isFinite(field.min) ? field.min : Number.NEGATIVE_INFINITY;
+      const max = Number.isFinite(field.max) ? field.max : Number.POSITIVE_INFINITY;
+      if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed) || !Number.isFinite(parsed) || parsed < min || parsed > max) {
+        return { error: `Invalid number for ${key}` };
       }
     }
 
