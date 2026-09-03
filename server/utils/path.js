@@ -23,11 +23,16 @@ function sanitizeCategory(raw) {
   return raw.toString().trim().replace(/[^a-zA-Z0-9 _!-]/g, '');
 }
 
-function resolveAudioPath(relativePath) {
-  const fullPath = path.resolve(AUDIO_DIR, relativePath);
-  if (fullPath === AUDIO_DIR) return fullPath;
-  if (!fullPath.startsWith(AUDIO_DIR + path.sep)) return null;
+function resolveAudioPathFrom(baseDir, relativePath) {
+  const resolvedBaseDir = path.resolve(baseDir);
+  const fullPath = path.resolve(resolvedBaseDir, relativePath);
+  if (fullPath === resolvedBaseDir) return fullPath;
+  if (!fullPath.startsWith(resolvedBaseDir + path.sep)) return null;
   return fullPath;
+}
+
+function resolveAudioPath(relativePath) {
+  return resolveAudioPathFrom(AUDIO_DIR, relativePath);
 }
 
 function hasAllowedExt(fileName) {
@@ -38,5 +43,6 @@ function hasAllowedExt(fileName) {
 module.exports = {
   sanitizeCategory,
   resolveAudioPath,
+  resolveAudioPathFrom,
   hasAllowedExt
 };

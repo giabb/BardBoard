@@ -90,7 +90,16 @@ function generateSessionSecret() {
 function unquote(raw) {
   const value = (raw || '').trim();
   if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
-    return value.slice(1, -1);
+    const quote = value[0];
+    const inner = value.slice(1, -1);
+    let unescaped = '';
+    for (let i = 0; i < inner.length; i += 1) {
+      if (inner[i] === '\\' && (inner[i + 1] === '\\' || inner[i + 1] === quote)) {
+        i += 1;
+      }
+      unescaped += inner[i];
+    }
+    return unescaped;
   }
   return value;
 }

@@ -68,7 +68,7 @@ export default function PlaylistPanel({
           >
             <span className="playlist-handle">::</span>
             <span className="playlist-track">{stripExt(file).replace(/[\\/]/g, ' / ')}</span>
-            <button className="playlist-remove" type="button" onClick={() => { const next = playlist.filter((_, i) => i !== idx); void onSetPlaylistOrder(next); }}>
+            <button className="playlist-remove" type="button" aria-label={`Remove ${stripExt(file).replace(/[\\/]/g, ' / ')} from playlist`} onClick={() => { const next = playlist.filter((_, i) => i !== idx); void onSetPlaylistOrder(next); }}>
               <TrashIcon />
             </button>
           </li>

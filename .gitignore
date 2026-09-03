@@ -37,6 +37,11 @@ sessions/
 .turbo/
 .cache/
 coverage/
+.e2e-runtime/
+.docker-smoke-runtime/
+playwright-report/
+test-results/
+blob-report/
 dist/
 *.log
 npm-debug.log*

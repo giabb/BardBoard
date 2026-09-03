@@ -25,6 +25,7 @@ import PlaylistPanel from './soundboard/PlaylistPanel';
 import TrackButton from './soundboard/TrackButton';
 import TrashIcon from './icons/TrashIcon';
 import { stripExt } from './soundboard/utils';
+import { createSoundboardApi, parseJsonResponse } from '../lib/soundboardApi.mjs';
 
 const COLORS = ['#8b5cf6', '#d4a843', '#e05d8a', '#5aa8d6', '#6fbf9a', '#ef4444', '#f59e0b'];
 const TRACK_DRAG_MIME = 'application/x-bardboard-track';
@@ -37,16 +38,6 @@ function getTrackCategory(filePath) {
   const slash = normalized.indexOf('/');
   if (slash <= 0) return '';
   return normalized.slice(0, slash);
-}
-
-async function parseJson(res) {
-  const text = await res.text();
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
 }
 
 export default function SoundboardClient() {
@@ -98,26 +89,17 @@ export default function SoundboardClient() {
   const channelId = selectedChannelId || '';
   const uploadMaxMb = Number(env?.uploadMaxMb) > 0 ? Number(env.uploadMaxMb) : 50;
 
-  const fetchApi = useCallback(async (url, options = {}) => {
-    const res = await fetch(url, options);
-    if (res.status === 401) {
-      window.location.href = '/login';
-      throw new Error('Unauthorized');
-    }
-    if (res.status === 503) {
-      const data = await res.clone().json().catch(() => ({}));
-      if (data?.setupRequired) {
-        window.location.href = '/setup';
-        throw new Error('Initial setup required');
-      }
-    }
-    return res;
-  }, []);
+  const api = useMemo(() => createSoundboardApi({
+    fetchImpl: (...args) => fetch(...args),
+    onUnauthorized: () => { window.location.href = '/login'; },
+    onSetupRequired: () => { window.location.href = '/setup'; }
+  }), []);
+  const fetchApi = api.fetchApi;
 
   const refreshVoiceChannels = useCallback(async () => {
     const res = await fetchApi('/api/voice-channels');
     if (!res.ok) return [];
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     const list = Array.isArray(data.channels) ? data.channels : [];
     setChannels(list);
     return list;
@@ -125,7 +107,7 @@ export default function SoundboardClient() {
 
   const refreshFiles = useCallback(async () => {
     const res = await fetchApi('/api/audio-files');
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     setAudio({ root: Array.isArray(data.root) ? data.root : [], categories: data.categories || {} });
   }, [fetchApi]);
 
@@ -137,7 +119,7 @@ export default function SoundboardClient() {
       return;
     }
     if (!res.ok) return;
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     setPlaylist(Array.isArray(data.queue) ? data.queue : []);
   }, [channelId, fetchApi]);
 
@@ -145,7 +127,7 @@ export default function SoundboardClient() {
     if (!channelId) return;
     const res = await fetchApi('/api/now-playing?channelId=' + encodeURIComponent(channelId));
     if (!res.ok) return;
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     const next = {
       song: data.song || null,
       elapsed: Number(data.elapsed) || 0,
@@ -173,8 +155,8 @@ export default function SoundboardClient() {
         fetchApi('/api/auth/status'),
         refreshVoiceChannels()
       ]);
-      const envData = await parseJson(envRes);
-      const authData = await parseJson(authRes);
+      const envData = await parseJsonResponse(envRes);
+      const authData = await parseJsonResponse(authRes);
       if (active) {
         setEnv(envData);
         setAuthEnabled(Boolean(authData.authEnabled));
@@ -194,10 +176,6 @@ export default function SoundboardClient() {
   }, [selectedChannelId]);
 
   useEffect(() => {
-    setUploadCategoryActive(uploadCategory || '');
-  }, [uploadCategory]);
-
-  useEffect(() => {
     const onMouseDown = event => {
       if (!uploadCategoryPickerRef.current) return;
       if (!uploadCategoryPickerRef.current.contains(event.target)) {
@@ -210,10 +188,7 @@ export default function SoundboardClient() {
   }, []);
 
   useEffect(() => {
-    if (!uploadCategoryOpen) {
-      setUploadCategoryMenuUp(false);
-      return;
-    }
+    if (!uploadCategoryOpen) return;
 
     const updatePlacement = () => {
       const picker = uploadCategoryPickerRef.current;
@@ -248,12 +223,12 @@ export default function SoundboardClient() {
           fetchApi('/api/get-volume?channelId=' + encodeURIComponent(channelId)),
           fetchApi('/api/pause-status?channelId=' + encodeURIComponent(channelId))
         ]);
-        setRepeatEnabled(Boolean((await parseJson(repeatRes)).repeatEnabled));
-        const volumePct = Math.round(((await parseJson(volumeRes)).volume || 0.5) * 100);
+        setRepeatEnabled(Boolean((await parseJsonResponse(repeatRes)).repeatEnabled));
+        const volumePct = Math.round(((await parseJsonResponse(volumeRes)).volume ?? 0.5) * 100);
         setVolume(volumePct);
         lastSentVolumeRef.current = volumePct;
         if (volumePct > 0) lastNonZeroVolumeRef.current = volumePct;
-        setPaused(Boolean((await parseJson(pauseRes)).paused));
+        setPaused(Boolean((await parseJsonResponse(pauseRes)).paused));
         await updateNowPlaying();
       } finally {
         setReady(true);
@@ -299,7 +274,7 @@ export default function SoundboardClient() {
   const nowTrack = np.song ? stripExt(np.song) : '';
   const progress = np.duration > 0 ? (npElapsed / np.duration) * 100 : 0;
 
-  const post = useCallback(async (url, body) => fetchApi(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), [fetchApi]);
+  const post = useCallback((url, body) => api.post(url, body), [api]);
   const requireChannel = useCallback(() => {
     if (channelId) return true;
     setStatus({ open: true, title: 'No channel selected', message: 'Select a voice channel first.' });
@@ -343,13 +318,13 @@ export default function SoundboardClient() {
 
   const playTrack = async file => {
     if (!requireChannel()) return;
-    await post('/api/play-audio', { fileName: file, channelId });
+    await api.playTrack(file, channelId);
     await updateNowPlaying();
   };
   const queueTrack = async file => {
     if (!requireChannel()) return;
-    const res = await post('/api/playlist/add', { fileName: file, channelId });
-    const data = await parseJson(res);
+    const res = await api.queueTrack(file, channelId);
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || 'Queue operation failed');
     if (Array.isArray(data.queue)) setPlaylist(data.queue);
   };
@@ -367,7 +342,7 @@ export default function SoundboardClient() {
   const togglePause = async () => {
     if (!requireChannel()) return;
     const res = await post('/api/toggle-pause', { channelId });
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     setPaused(Boolean(data.paused));
   };
   const toggleRepeat = async () => { if (!requireChannel()) return; setRepeatEnabled(v => !v); await post('/api/toggle-repeat', { channelId }); };
@@ -391,7 +366,7 @@ export default function SoundboardClient() {
     try {
       const apiPath = path.startsWith('/api/') ? path : `/api${path}`;
       const res = await post(apiPath, { channelId });
-      const data = await parseJson(res);
+      const data = await parseJsonResponse(res);
       if (!res.ok) throw new Error(data.error || 'Playlist operation failed');
       if (Array.isArray(data.queue)) setPlaylist(data.queue);
       await Promise.all([refreshPlaylist(), updateNowPlaying()]);
@@ -402,7 +377,7 @@ export default function SoundboardClient() {
   const setPlaylistOrder = async next => {
     if (!requireChannel()) return;
     setPlaylist(next);
-    await post('/api/playlist/set', { channelId, queue: next });
+    await api.setPlaylist(next, channelId);
   };
   const onTrackDragStart = file => {
     draggedTrackRef.current = file;
@@ -420,9 +395,9 @@ export default function SoundboardClient() {
     setSelectedChannelId(nextChannelId);
     if (!nextChannelId) return;
     try {
-      const res = await post('/api/switch-channel', { channelId: nextChannelId });
+      const res = await api.switchChannel(nextChannelId);
       if (!res.ok && res.status !== 404) {
-        const data = await parseJson(res);
+        const data = await parseJsonResponse(res);
         throw new Error(data.error || 'Failed to switch channel');
       }
       await Promise.all([refreshPlaylist(), updateNowPlaying()]);
@@ -467,7 +442,7 @@ export default function SoundboardClient() {
     if (!file || (!options.createCategory && sourceCategory === targetCategory)) return;
 
     const res = await post('/api/audio-file/move', { path: file, targetCategory, createCategory: Boolean(options.createCategory) });
-    const data = await parseJson(res);
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || 'Move failed');
     await refreshFiles();
   }, [post, refreshFiles]);
@@ -604,7 +579,7 @@ export default function SoundboardClient() {
     action: async () => {
       const res = await fetchApi('/api/audio-file?path=' + encodeURIComponent(file), { method: 'DELETE' });
       if (!res.ok) {
-        const data = await parseJson(res);
+        const data = await parseJsonResponse(res);
         throw new Error(data.error || 'Delete failed');
       }
       await refreshFiles();
@@ -618,7 +593,7 @@ export default function SoundboardClient() {
     action: async () => {
       const res = await fetchApi('/api/audio-category?name=' + encodeURIComponent(name), { method: 'DELETE' });
       if (!res.ok) {
-        const data = await parseJson(res);
+        const data = await parseJsonResponse(res);
         throw new Error(data.error || 'Delete failed');
       }
       await refreshFiles();
@@ -645,11 +620,11 @@ export default function SoundboardClient() {
     try {
       if (renameModal.type === 'file') {
         const res = await post('/api/audio-file/rename', { path: renameModal.source, newName: nextName });
-        const data = await parseJson(res);
+        const data = await parseJsonResponse(res);
         if (!res.ok) throw new Error(data.error || 'Rename failed');
       } else {
         const res = await post('/api/audio-category/rename', { name: renameModal.source, newName: nextName });
-        const data = await parseJson(res);
+        const data = await parseJsonResponse(res);
         if (!res.ok) throw new Error(data.error || 'Rename failed');
       }
       setRenameModal({ open: false, type: 'file', source: '', value: '' });
@@ -669,7 +644,7 @@ export default function SoundboardClient() {
     }
     try {
       const res = await post('/api/audio-category', { name });
-      const data = await parseJson(res);
+      const data = await parseJsonResponse(res);
       if (!res.ok) throw new Error(data.error || 'Create category failed');
       setCategoryOpen(false);
       setCategoryName('');
@@ -724,6 +699,7 @@ export default function SoundboardClient() {
 
     setUploadLoading(true);
     setUploadProgress(0);
+    let uploadedCount = 0;
     try {
       const totalBytes = uploadFiles.reduce((sum, file) => sum + Number(file.size || 0), 0);
       let uploadedBytes = 0;
@@ -737,6 +713,7 @@ export default function SoundboardClient() {
           }
         });
         uploadedBytes += fileSize;
+        uploadedCount += 1;
         if (totalBytes > 0) {
           const pct = Math.round((uploadedBytes / totalBytes) * 100);
           setUploadProgress(Math.max(0, Math.min(99, pct)));
@@ -746,11 +723,26 @@ export default function SoundboardClient() {
       setUploadOpen(false);
       setUploadFiles([]);
       setUploadCategory('');
+      setUploadCategoryActive('');
       setUploadCategoryNew('');
       await refreshFiles();
       setStatus({ open: true, title: 'Upload complete', message: 'Your songs are ready.' });
     } catch (err) {
-      setStatus({ open: true, title: 'Upload failed', message: err?.message || 'Upload failed.' });
+      if (uploadedCount > 0) {
+        setUploadFiles(prev => prev.slice(uploadedCount));
+        try {
+          await refreshFiles();
+        } catch {
+          // The next regular refresh will reconcile the soundboard.
+        }
+        setStatus({
+          open: true,
+          title: 'Upload partially complete',
+          message: `${uploadedCount} file${uploadedCount === 1 ? '' : 's'} uploaded. ${err?.message || 'The next file failed.'}`
+        });
+      } else {
+        setStatus({ open: true, title: 'Upload failed', message: err?.message || 'Upload failed.' });
+      }
     } finally {
       setUploadLoading(false);
       setUploadProgress(0);
@@ -882,7 +874,7 @@ export default function SoundboardClient() {
         </div>
       </div>
 
-      <div id="uploadModal" className={`upload-modal${uploadOpen ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setUploadOpen(false); }}><div className="upload-panel"><div className="upload-head"><h2 id="uploadTitle">Add Songs</h2><button id="closeUpload" className="upload-close" type="button" onClick={() => setUploadOpen(false)}>&times;</button></div><div id="uploadLoading" className={`upload-loading${uploadLoading ? ' show' : ''}`}><Image className="upload-ouroboros" src="/ouroboros.svg" alt="Uploading" width={90} height={90} /><p>Uploading... {uploadProgress}%</p><div className="upload-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={uploadProgress}><div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} /></div></div><form id="uploadForm" className="upload-form" onSubmit={e => void submitUpload(e)}><input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden onChange={e => { addUploadFiles(e.target.files); e.target.value = ''; }} /><label id="uploadDrop" className={`upload-drop${uploadDropActive ? ' is-active' : ''}`} htmlFor="uploadFile" onDragEnter={e => { e.preventDefault(); setUploadDropActive(true); }} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setUploadDropActive(true); }} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget)) setUploadDropActive(false); }} onDrop={handleUploadDrop}><span className="drop-title">Drag your song(s) here</span><span className="drop-sub">or <span className="drop-link">browse</span> your files</span><span id="uploadFileName" className="drop-file">{uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'No files selected'}</span></label><div id="uploadFileList" className="upload-file-list">{uploadFiles.map((f, i) => <div key={`${f.name}-${i}`} className="upload-file-item"><span className="upload-file-index">{i + 1}.</span><span className="upload-file-name">{f.name}</span><button className="upload-file-remove" type="button" onClick={() => setUploadFiles(prev => prev.filter((_, x) => x !== i))}><TrashIcon /></button></div>)}</div><div className="upload-fields"><label className="field-label" htmlFor="uploadCategorySelect">Category</label><div className="field-picker" ref={uploadCategoryPickerRef}><button id="uploadCategorySelect" className={`field-select field-select-trigger${uploadCategoryOpen ? ' open' : ''}`} type="button" aria-haspopup="listbox" aria-expanded={uploadCategoryOpen} onClick={() => setUploadCategoryOpen(v => !v)} onKeyDown={onUploadCategoryKeyDown}><span className="field-select-text">{uploadCategoryOptions.find(opt => opt.value === uploadCategory)?.label || 'Root (no category)'}</span><svg className="field-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg></button>{uploadCategoryOpen && (<div className={`field-select-menu${uploadCategoryMenuUp ? ' up' : ''}`} role="listbox" tabIndex={0} onKeyDown={onUploadCategoryKeyDown}>{uploadCategoryOptions.map(opt => { const isActive = uploadCategoryActive === opt.value; const isSelected = uploadCategory === opt.value; return <button key={opt.value || '__root'} type="button" role="option" aria-selected={isSelected} className={`field-select-option${isActive ? ' active' : ''}${isSelected ? ' selected' : ''}`} onMouseEnter={() => setUploadCategoryActive(opt.value)} onClick={() => { setUploadCategory(opt.value); setUploadCategoryOpen(false); }}>{opt.label}</button>; })}</div>)}</div><div id="newCategoryFields" className={`new-category-fields${uploadCategory === '__new__' ? '' : ' is-hidden'}`}><label className="field-label" htmlFor="uploadCategoryNew">New category name</label><input id="uploadCategoryNew" className="field-input" placeholder="New category name" value={uploadCategoryNew} onChange={e => setUploadCategoryNew(e.target.value)} /></div></div><div className="upload-actions"><button type="submit" className="ctrl-btn ctrl-upload">Upload</button></div></form></div></div>
+      <div id="uploadModal" className={`upload-modal${uploadOpen ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setUploadOpen(false); }}><div className="upload-panel"><div className="upload-head"><h2 id="uploadTitle">Add Songs</h2><button id="closeUpload" className="upload-close" type="button" onClick={() => setUploadOpen(false)}>&times;</button></div><div id="uploadLoading" className={`upload-loading${uploadLoading ? ' show' : ''}`}><Image className="upload-ouroboros" src="/ouroboros.svg" alt="Uploading" width={90} height={90} /><p>Uploading... {uploadProgress}%</p><div className="upload-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={uploadProgress}><div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} /></div></div><form id="uploadForm" className="upload-form" onSubmit={e => void submitUpload(e)}><input id="uploadFile" type="file" accept=".mp3,.wav,.ogg,.m4a" multiple hidden onChange={e => { addUploadFiles(e.target.files); e.target.value = ''; }} /><label id="uploadDrop" className={`upload-drop${uploadDropActive ? ' is-active' : ''}`} htmlFor="uploadFile" onDragEnter={e => { e.preventDefault(); setUploadDropActive(true); }} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setUploadDropActive(true); }} onDragLeave={e => { const nextTarget = e.relatedTarget; if (!e.currentTarget.contains(nextTarget)) setUploadDropActive(false); }} onDrop={handleUploadDrop}><span className="drop-title">Drag your song(s) here</span><span className="drop-sub">or <span className="drop-link">browse</span> your files</span><span id="uploadFileName" className="drop-file">{uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'No files selected'}</span></label><div id="uploadFileList" className="upload-file-list">{uploadFiles.map((f, i) => <div key={`${f.name}-${i}`} className="upload-file-item"><span className="upload-file-index">{i + 1}.</span><span className="upload-file-name">{f.name}</span><button className="upload-file-remove" type="button" onClick={() => setUploadFiles(prev => prev.filter((_, x) => x !== i))}><TrashIcon /></button></div>)}</div><div className="upload-fields"><label className="field-label" htmlFor="uploadCategorySelect">Category</label><div className="field-picker" ref={uploadCategoryPickerRef}><button id="uploadCategorySelect" className={`field-select field-select-trigger${uploadCategoryOpen ? ' open' : ''}`} type="button" aria-haspopup="listbox" aria-expanded={uploadCategoryOpen} onClick={() => setUploadCategoryOpen(v => !v)} onKeyDown={onUploadCategoryKeyDown}><span className="field-select-text">{uploadCategoryOptions.find(opt => opt.value === uploadCategory)?.label || 'Root (no category)'}</span><svg className="field-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg></button>{uploadCategoryOpen && (<div className={`field-select-menu${uploadCategoryMenuUp ? ' up' : ''}`} role="listbox" tabIndex={0} onKeyDown={onUploadCategoryKeyDown}>{uploadCategoryOptions.map(opt => { const isActive = uploadCategoryActive === opt.value; const isSelected = uploadCategory === opt.value; return <button key={opt.value || '__root'} type="button" role="option" aria-selected={isSelected} className={`field-select-option${isActive ? ' active' : ''}${isSelected ? ' selected' : ''}`} onMouseEnter={() => setUploadCategoryActive(opt.value)} onClick={() => { setUploadCategory(opt.value); setUploadCategoryActive(opt.value); setUploadCategoryOpen(false); }}>{opt.label}</button>; })}</div>)}</div><div id="newCategoryFields" className={`new-category-fields${uploadCategory === '__new__' ? '' : ' is-hidden'}`}><label className="field-label" htmlFor="uploadCategoryNew">New category name</label><input id="uploadCategoryNew" className="field-input" placeholder="New category name" value={uploadCategoryNew} onChange={e => setUploadCategoryNew(e.target.value)} /></div></div><div className="upload-actions"><button type="submit" className="ctrl-btn ctrl-upload">Upload</button></div></form></div></div>
 
       <div id="statusModal" className={`status-modal${status.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setStatus(prev => ({ ...prev, open: false })); }}><div className="status-panel"><h2 id="statusTitle">{status.title}</h2><p id="statusMessage">{status.message}</p><div className="status-actions"><button id="statusOk" className="ctrl-btn ctrl-upload" type="button" onClick={() => setStatus(prev => ({ ...prev, open: false }))}>Ok</button></div></div></div>
       <div id="confirmModal" className={`confirm-modal${confirm.open ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setConfirm(prev => ({ ...prev, open: false })); }}><div className="confirm-panel"><h2 id="confirmTitle">{confirm.title}</h2><p id="confirmMessage">{confirm.text}</p><div className="confirm-actions"><button id="confirmCancel" className="ctrl-btn" type="button" onClick={() => setConfirm(prev => ({ ...prev, open: false }))}>Cancel</button><button id="confirmOk" className="ctrl-btn confirm-danger" type="button" onClick={() => { const action = confirm.action; setConfirm(prev => ({ ...prev, open: false })); if (action) void action().catch(err => setStatus({ open: true, title: 'Error', message: err?.message || 'Operation failed.' })); }}>Delete</button></div></div></div>

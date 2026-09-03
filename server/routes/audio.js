@@ -45,8 +45,14 @@ function createAudioRoutes(audioService) {
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
     const safeFile = normalizeAudioFileName(fileName);
     if (!safeFile) return res.status(400).json({ error: 'Invalid fileName' });
-    await audioService.playAudioInDiscord(safeFile, channelId);
-    res.sendStatus(200);
+    try {
+      const ok = await audioService.playAudioInDiscord(safeFile, channelId);
+      if (!ok) return res.status(404).json({ error: 'Channel or audio file not found' });
+      return res.sendStatus(200);
+    } catch (err) {
+      console.error('Play audio error:', err);
+      return res.status(500).json({ error: 'Playback failed' });
+    }
   });
 
   router.post('/toggle-pause', actionLimiter, (req, res) => {
@@ -89,6 +95,9 @@ function createAudioRoutes(audioService) {
   router.post('/set-volume', actionLimiter, (req, res) => {
     const { channelId, volume } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    if (volume === null || volume === undefined || (typeof volume === 'string' && !volume.trim())) {
+      return res.status(400).json({ error: 'Invalid volume' });
+    }
     const volumeValue = Number(volume);
     if (!Number.isFinite(volumeValue) || volumeValue < 0 || volumeValue > 1) {
       return res.status(400).json({ error: 'Invalid volume' });
@@ -106,6 +115,9 @@ function createAudioRoutes(audioService) {
   router.post('/seek', actionLimiter, async (req, res) => {
     const { channelId, offsetSecs } = req.body;
     if (!isValidChannelId(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+    if (offsetSecs === null || offsetSecs === undefined || (typeof offsetSecs === 'string' && !offsetSecs.trim())) {
+      return res.status(400).json({ error: 'Invalid offsetSecs' });
+    }
     const offsetValue = Number(offsetSecs);
     if (!Number.isFinite(offsetValue) || offsetValue < 0) {
       return res.status(400).json({ error: 'Invalid offsetSecs' });

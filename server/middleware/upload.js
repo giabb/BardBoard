@@ -21,34 +21,51 @@ const multer = require('multer');
 const { AUDIO_DIR, ALLOWED_EXT } = require('../constants');
 const { sanitizeCategory } = require('../utils/path');
 
-const maxUploadMb = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
+function createUpload(options = {}) {
+  const audioDir = options.audioDir || AUDIO_DIR;
+  const allowedExt = options.allowedExt || ALLOWED_EXT;
+  const maxUploadMb = options.maxUploadMb
+    ?? Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const category = sanitizeCategory(req.query.category);
-      const targetDir = category ? path.join(AUDIO_DIR, category) : AUDIO_DIR;
-      try {
-        fs.mkdirSync(targetDir, { recursive: true });
-        cb(null, targetDir);
-      } catch (err) {
-        cb(err);
+  return multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const input = String(req.query.category || '').trim();
+        const category = sanitizeCategory(input);
+        if (input && category !== input) return cb(new Error('Invalid category'));
+
+        const targetDir = category ? path.join(audioDir, category) : audioDir;
+        try {
+          fs.mkdirSync(targetDir, { recursive: true });
+          cb(null, targetDir);
+        } catch (err) {
+          cb(err);
+        }
+      },
+      filename: (req, file, cb) => {
+        const fileName = path.basename(file.originalname);
+        const category = sanitizeCategory(String(req.query.category || '').trim());
+        const targetPath = path.join(category ? path.join(audioDir, category) : audioDir, fileName);
+        if (fs.existsSync(targetPath)) {
+          return cb(new Error('A file with the same name already exists'));
+        }
+        cb(null, fileName);
       }
+    }),
+    limits: {
+      fileSize: maxUploadMb * 1024 * 1024
     },
-    filename: (req, file, cb) => {
-      cb(null, path.basename(file.originalname));
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!allowedExt.has(ext)) {
+        return cb(new Error('Unsupported file type'));
+      }
+      cb(null, true);
     }
-  }),
-  limits: {
-    fileSize: maxUploadMb * 1024 * 1024
-  },
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_EXT.has(ext)) {
-      return cb(new Error('Unsupported file type'));
-    }
-    cb(null, true);
-  }
-});
+  });
+}
+
+const upload = createUpload();
 
 module.exports = upload;
+module.exports.createUpload = createUpload;

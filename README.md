@@ -339,6 +339,54 @@ npm test
 npm audit
 ```
 
+### Automated bot API tests
+
+Run the bot API test suite with:
+
+```bash
+npm test
+```
+
+The tests send real HTTP requests to temporary local Express servers and replace
+Discord voice primitives with in-memory test doubles. They cover audio controls,
+playback state, authentication and permissions, CORS, file and category management,
+uploads, configuration, channel switching, and playlist behavior without requiring a
+Discord token, a voice channel, `ffmpeg`, or a running application.
+
+Generate a source coverage report with:
+
+```bash
+npm run test:coverage
+```
+
+Run the Chromium end-to-end tests with:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+The end-to-end suite builds and starts the real Next.js application, then checks
+login, persistent sessions and logout, first-boot setup, settings permissions and
+validation, voice-channel selection, playback, audio upload/rename/move/delete flows,
+playlist reordering and commands, and visible API error feedback in a browser. Most
+Discord API responses are intercepted for determinism; a dedicated smoke test instead
+uses Next.js's real proxy and an isolated Express server with a fake Discord channel.
+No real bot token or Discord connection is required. Ports `3001` and `3100` must be
+available while the end-to-end suite runs.
+
+Validate the production Docker deployment with:
+
+```bash
+npm run test:docker
+```
+
+This smoke test validates the Compose configuration, builds the production image,
+starts the API and web containers under an isolated project name, waits for both
+health checks, and calls `/api/health` through the web proxy. It chooses a free web
+port automatically and removes its containers, network, volume, and temporary session
+directory when finished. Docker with Compose must be running.
+
 The project uses:
 
 - Next.js 16

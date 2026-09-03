@@ -21,10 +21,13 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const upload = require('../middleware/upload');
 const { AUDIO_DIR } = require('../constants');
-const { sanitizeCategory, resolveAudioPath, hasAllowedExt } = require('../utils/path');
+const { sanitizeCategory, resolveAudioPathFrom, hasAllowedExt } = require('../utils/path');
 
-function createFileRoutes(audioService) {
+function createFileRoutes(audioService, options = {}) {
   const router = express.Router();
+  const audioDir = path.resolve(options.audioDir || AUDIO_DIR);
+  const uploadMiddleware = options.upload || upload;
+  const resolveAudioPath = relativePath => resolveAudioPathFrom(audioDir, relativePath);
   const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: Number.parseInt(process.env.RATE_LIMIT_FILES || '60', 10),
@@ -42,7 +45,7 @@ function createFileRoutes(audioService) {
    * @returns {string[]} A list of audio file names.
    */
   router.get('/audio-files', (req, res) => {
-    const baseDir = AUDIO_DIR;
+    const baseDir = audioDir;
 
     let entries = [];
     try {
@@ -80,7 +83,7 @@ function createFileRoutes(audioService) {
    * @query {string} category - Optional category folder name.
    */
   router.post('/upload-audio', (req, res) => {
-    upload.single('file')(req, res, err => {
+    uploadMiddleware.single('file')(req, res, err => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file) return res.status(400).json({ error: 'Missing file' });
       return res.json({ ok: true, file: req.file.filename });
@@ -147,14 +150,14 @@ function createFileRoutes(audioService) {
     const targetCategoryInput = rawTargetCategory == null ? '' : rawTargetCategory.toString();
     const targetCategory = sanitizeCategory(targetCategoryInput);
     const createCategory = Boolean(req.body?.createCategory);
-    if (targetCategoryInput.trim() && !targetCategory) {
+    if (targetCategoryInput.trim() && targetCategory !== targetCategoryInput.trim()) {
       return res.status(400).json({ error: 'Invalid category' });
     }
 
     const sourceFullPath = resolveAudioPath(sourceRelPath);
     if (!sourceFullPath) return res.status(400).json({ error: 'Invalid path' });
 
-    const targetDirPath = targetCategory ? resolveAudioPath(targetCategory) : AUDIO_DIR;
+    const targetDirPath = targetCategory ? resolveAudioPath(targetCategory) : audioDir;
     if (!targetDirPath) return res.status(400).json({ error: 'Invalid category' });
 
     const targetFileName = path.basename(sourceRelPath);
@@ -268,7 +271,7 @@ function createFileRoutes(audioService) {
     if (name !== input.trim()) return res.status(400).json({ error: 'Invalid category' });
 
     const dirPath = resolveAudioPath(name);
-    if (!dirPath || dirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid category' });
+    if (!dirPath || dirPath === audioDir) return res.status(400).json({ error: 'Invalid category' });
     if (fs.existsSync(dirPath)) return res.status(409).json({ error: 'Category already exists' });
 
     try {
@@ -288,13 +291,14 @@ function createFileRoutes(audioService) {
    * @query {string} name - Category folder name.
    */
   router.delete('/audio-category', (req, res) => {
-    const name = sanitizeCategory(req.query.name);
-    if (!name) return res.status(400).json({ error: 'Invalid category' });
+    const input = String(req.query.name || '').trim();
+    const name = sanitizeCategory(input);
+    if (!name || name !== input) return res.status(400).json({ error: 'Invalid category' });
     if (audioService && typeof audioService.isCategoryInUse === 'function' && audioService.isCategoryInUse(name)) {
       return res.status(409).json({ error: 'Category contains file(s) currently in use' });
     }
     const dirPath = resolveAudioPath(name);
-    if (!dirPath || dirPath === AUDIO_DIR) {
+    if (!dirPath || dirPath === audioDir) {
       return res.status(400).json({ error: 'Invalid category' });
     }
 
@@ -335,8 +339,8 @@ function createFileRoutes(audioService) {
 
     const sourceDirPath = resolveAudioPath(sourceName);
     const targetDirPath = resolveAudioPath(targetName);
-    if (!sourceDirPath || sourceDirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid category' });
-    if (!targetDirPath || targetDirPath === AUDIO_DIR) return res.status(400).json({ error: 'Invalid target category' });
+    if (!sourceDirPath || sourceDirPath === audioDir) return res.status(400).json({ error: 'Invalid category' });
+    if (!targetDirPath || targetDirPath === audioDir) return res.status(400).json({ error: 'Invalid target category' });
 
     try {
       const sourceStat = fs.statSync(sourceDirPath);

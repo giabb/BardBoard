@@ -11,7 +11,10 @@
     "start:bot": "node server/app.js",
     "start:web": "next start",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "test:e2e": "npm run build && playwright test",
+    "test:docker": "node test-support/docker-smoke.js"
   },
   "keywords": [
     "nodejs",
@@ -29,6 +32,8 @@
   "license": "GPL-3.0-or-later",
   "description": "Soundboard for DND sessions (or whatever you like)",
   "dependencies": {
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
     "@discordjs/voice": "^0.19.2",
     "cors": "^2.8.6",
     "discord.js": "^14.26.4",
@@ -50,6 +55,7 @@
     "postcss": "^8.5.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "concurrently": "^10.0.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.7"

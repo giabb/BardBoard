@@ -23,7 +23,7 @@ services:
       args:
         BACKEND_URL: http://bard-board-bot:${BOT_PORT:-3001}
     image: bardboard:local
-    container_name: web
+    container_name: ${WEB_CONTAINER_NAME:-web}
     command: ["npm", "run", "start:web"]
     ports:
       - "${WEB_PORT:-3000}:${WEB_PORT:-3000}"
@@ -35,11 +35,18 @@ services:
       - BACKEND_URL=http://bard-board-bot:${BOT_PORT:-3001}
       - PORT=${WEB_PORT:-3000}
     depends_on:
-      - bard-board-bot
+      bard-board-bot:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   bard-board-bot:
     image: bardboard:local
-    container_name: bot
+    container_name: ${BOT_CONTAINER_NAME:-bot}
     command: ["node", "server/app.js"]
     restart: always
     env_file:
@@ -53,6 +60,12 @@ services:
       - ./audio-files:/usr/src/app/audio-files
       - ${SESSION_DIR:-./sessions}:/usr/src/app/sessions
       - bardboard-config:/usr/src/app/config
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.BOT_PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
 volumes:
   bardboard-config:

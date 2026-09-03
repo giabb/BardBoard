@@ -30,7 +30,14 @@ const musicmetadata = require('music-metadata');
 const { AUDIO_DIR } = require('../constants');
 const { resolveAudioPath, hasAllowedExt } = require('../utils/path');
 
-function createDiscordAudioService(discordClient) {
+function createDiscordAudioService(discordClient, dependencies = {}) {
+  const joinVoiceChannelImpl = dependencies.joinVoiceChannel || joinVoiceChannel;
+  const createAudioPlayerImpl = dependencies.createAudioPlayer || createAudioPlayer;
+  const createAudioResourceImpl = dependencies.createAudioResource || createAudioResource;
+  const spawnImpl = dependencies.spawn || spawn;
+  const resolveAudioPathImpl = dependencies.resolveAudioPath || resolveAudioPath;
+  const parseAudioMetadata = dependencies.parseAudioMetadata || musicmetadata.parseFile;
+  const sodiumReady = dependencies.sodiumReady || sodium.ready;
   const activeAudioPlayers = new Map();
   const activeConnections = new Map();
   const repeatEnabled = new Map();
@@ -219,13 +226,13 @@ function createDiscordAudioService(discordClient) {
     const currentFile = currentAudioFile.get(guildId);
     if (!player || !currentFile) return false;
 
-    const noisePath = resolveAudioPath(noiseFile);
-    const mainPath = resolveAudioPath(currentFile);
+    const noisePath = resolveAudioPathImpl(noiseFile);
+    const mainPath = resolveAudioPathImpl(currentFile);
     if (!noisePath || !mainPath) return false;
 
     const offsetSecs = getElapsedSeconds(guildId);
     const noiseVolume = getNoiseVolume();
-    const ffmpeg = spawn('ffmpeg', [
+    const ffmpeg = spawnImpl('ffmpeg', [
       '-ss', String(offsetSecs),
       '-i', mainPath,
       '-i', noisePath,
@@ -240,13 +247,13 @@ function createDiscordAudioService(discordClient) {
       console.error('FFmpeg overlay error:', err);
     });
 
-    const resource = createAudioResource(ffmpeg.stdout, {
+    const resource = createAudioResourceImpl(ffmpeg.stdout, {
       inputType: StreamType.Raw,
       inlineVolume: true,
       metadata: { title: currentFile }
     });
 
-    const volume = currentVolume.get(guildId) || 0.5;
+    const volume = currentVolume.get(guildId) ?? 0.5;
     resource.volume.setVolume(volume);
 
     setPlaybackResource(guildId, resource, ffmpeg, offsetSecs);
@@ -317,11 +324,11 @@ function createDiscordAudioService(discordClient) {
   }
 
   async function playAudioInDiscord(fileName, channelId) {
-    await sodium.ready;
+    await sodiumReady;
     const channel = getChannel(channelId);
     if (!channel) return false;
     if (!hasAllowedExt(fileName)) return false;
-    const safePath = resolveAudioPath(fileName);
+    const safePath = resolveAudioPathImpl(fileName);
     if (!safePath) return false;
 
     try {
@@ -348,7 +355,7 @@ function createDiscordAudioService(discordClient) {
         connection = null;
       }
       if (!connection) {
-        connection = joinVoiceChannel({
+        connection = joinVoiceChannelImpl({
           channelId: channel.id,
           guildId: channel.guild.id,
           adapterCreator: channel.guild.voiceAdapterCreator
@@ -361,7 +368,7 @@ function createDiscordAudioService(discordClient) {
         });
       }
 
-      const player = createAudioPlayer({
+      const player = createAudioPlayerImpl({
         behaviors: { noSubscriber: NoSubscriberBehavior.Pause }
       });
 
@@ -373,9 +380,9 @@ function createDiscordAudioService(discordClient) {
       currentAudioFile.set(channel.guild.id, fileName);
       playbackMode.set(channel.guild.id, isNoise ? 'noise' : 'main');
 
-      const resource = createAudioResource(safePath, { inlineVolume: true });
+      const resource = createAudioResourceImpl(safePath, { inlineVolume: true });
 
-      const volume = currentVolume.get(channel.guild.id) || 0.5;
+      const volume = currentVolume.get(channel.guild.id) ?? 0.5;
       resource.volume.setVolume(volume);
 
       connection.subscribe(player);
@@ -393,13 +400,13 @@ function createDiscordAudioService(discordClient) {
           if (repeatEnabled.get(channel.guild.id)) {
             const currentFile = currentAudioFile.get(channel.guild.id);
             if (currentFile) {
-              const repeatPath = resolveAudioPath(currentFile);
+              const repeatPath = resolveAudioPathImpl(currentFile);
               if (!repeatPath) {
                 cleanupPlayerOnly(channel.guild.id);
                 return;
               }
-              const newResource = createAudioResource(repeatPath, { inlineVolume: true });
-              newResource.volume.setVolume(currentVolume.get(channel.guild.id) || 0.5);
+              const newResource = createAudioResourceImpl(repeatPath, { inlineVolume: true });
+              newResource.volume.setVolume(currentVolume.get(channel.guild.id) ?? 0.5);
               setPlaybackResource(channel.guild.id, newResource);
               player.play(newResource);
             }
@@ -486,7 +493,7 @@ function createDiscordAudioService(discordClient) {
       connection = null;
     }
 
-    connection = joinVoiceChannel({
+    connection = joinVoiceChannelImpl({
       channelId: channel.id,
       guildId,
       adapterCreator: channel.guild.voiceAdapterCreator
@@ -543,7 +550,7 @@ function createDiscordAudioService(discordClient) {
     const channel = getChannel(channelId);
     if (!channel) return { volume: 0.5 };
     const guildId = channel.guild.id;
-    return { volume: currentVolume.get(guildId) || 0.5 };
+    return { volume: currentVolume.get(guildId) ?? 0.5 };
   }
 
   async function seek(channelId, offsetSecs) {
@@ -555,11 +562,11 @@ function createDiscordAudioService(discordClient) {
     const player = activeAudioPlayers.get(guildId);
     if (!fileName || !player) return false;
 
-    const volume = currentVolume.get(guildId) || 0.5;
-    const filePath = resolveAudioPath(fileName);
+    const volume = currentVolume.get(guildId) ?? 0.5;
+    const filePath = resolveAudioPathImpl(fileName);
     if (!filePath) return false;
 
-    const ffmpeg = spawn('ffmpeg', [
+    const ffmpeg = spawnImpl('ffmpeg', [
       '-ss', String(offsetSecs),
       '-i', filePath,
       '-f', 's16le',
@@ -572,7 +579,7 @@ function createDiscordAudioService(discordClient) {
       console.error('FFmpeg spawn error:', err);
     });
 
-    const resource = createAudioResource(ffmpeg.stdout, {
+    const resource = createAudioResourceImpl(ffmpeg.stdout, {
       inputType: StreamType.Raw,
       inlineVolume: true,
       metadata: { title: fileName }
@@ -605,9 +612,9 @@ function createDiscordAudioService(discordClient) {
     let duration = trackDurations.get(fileName);
     if (duration === undefined) {
       try {
-        const safePath = resolveAudioPath(fileName);
+        const safePath = resolveAudioPathImpl(fileName);
         if (!safePath) return { song: null, elapsed: 0, duration: 0, paused: false, playing: false };
-        const metadata = await musicmetadata.parseFile(safePath);
+        const metadata = await parseAudioMetadata(safePath);
         duration = metadata.format.duration || 0;
       } catch {
         duration = 0;

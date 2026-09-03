@@ -182,6 +182,12 @@ if (corsOrigins.length > 0) {
     },
     credentials: true
   }));
+  app.use((err, _req, res, next) => {
+    if (err?.message === 'Not allowed by CORS') {
+      return res.status(403).json({ error: 'Origin not allowed' });
+    }
+    return next(err);
+  });
 }
 cleanupNonRememberSessions();
 app.use(session({
@@ -471,7 +477,18 @@ function ensureDiscordLogin() {
     console.error(err?.message || err);
   });
 }
-ensureDiscordLogin();
-
 const port = Number.parseInt(process.env.BOT_PORT || '3001', 10);
-app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));
+function start() {
+  ensureDiscordLogin();
+  return app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));
+}
+
+if (require.main === module) start();
+
+module.exports = {
+  app,
+  audioService,
+  discordClient,
+  ensureDiscordLogin,
+  start
+};
