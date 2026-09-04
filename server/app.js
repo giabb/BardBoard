@@ -375,7 +375,7 @@ app.post('/settings/restart', (req, res) => {
   res.json({ ok: true, restarting: !isDev });
   if (isDev) return;
   setTimeout(() => {
-    process.exit(0);
+    shutdownAndExit('settings restart');
   }, 200);
 });
 
@@ -478,17 +478,71 @@ function ensureDiscordLogin() {
   });
 }
 const port = Number.parseInt(process.env.BOT_PORT || '3001', 10);
+let httpServer = null;
+let stopPromise = null;
+
 function start() {
+  if (httpServer) return httpServer;
+  stopPromise = null;
   ensureDiscordLogin();
-  return app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));
+  httpServer = app.listen(port, '0.0.0.0', () => console.log('Bot/API server running on port', port));
+  return httpServer;
 }
 
-if (require.main === module) start();
+function stop() {
+  if (stopPromise) return stopPromise;
+  const serverToClose = httpServer;
+
+  stopPromise = Promise.all([
+    new Promise((resolve, reject) => {
+      if (!serverToClose) return resolve();
+      serverToClose.close(error => error ? reject(error) : resolve());
+      if (typeof serverToClose.closeIdleConnections === 'function') {
+        serverToClose.closeIdleConnections();
+      }
+    }),
+    Promise.resolve().then(() => audioService.shutdown()),
+    Promise.resolve().then(() => discordClient.destroy())
+  ]).then(() => {
+    if (httpServer === serverToClose) httpServer = null;
+  });
+
+  return stopPromise;
+}
+
+let exitStarted = false;
+async function shutdownAndExit(reason, exitCode = 0) {
+  if (exitStarted) return;
+  exitStarted = true;
+  console.log(`Shutting down (${reason})...`);
+  const forceExitTimer = setTimeout(() => {
+    console.error('Graceful shutdown timed out; forcing exit.');
+    process.exit(1);
+  }, 10000);
+  forceExitTimer.unref();
+
+  try {
+    await stop();
+    clearTimeout(forceExitTimer);
+    process.exit(exitCode);
+  } catch (error) {
+    clearTimeout(forceExitTimer);
+    console.error('Graceful shutdown failed:', error);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  process.once('SIGTERM', () => shutdownAndExit('SIGTERM'));
+  process.once('SIGINT', () => shutdownAndExit('SIGINT'));
+  start();
+}
 
 module.exports = {
   app,
   audioService,
   discordClient,
   ensureDiscordLogin,
-  start
+  start,
+  stop
 };

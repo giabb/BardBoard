@@ -17,6 +17,7 @@
 */
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('stream');
 const multer = require('multer');
 const { AUDIO_DIR, ALLOWED_EXT } = require('../constants');
 const { sanitizeCategory } = require('../utils/path');
@@ -24,34 +25,64 @@ const { sanitizeCategory } = require('../utils/path');
 function createUpload(options = {}) {
   const audioDir = options.audioDir || AUDIO_DIR;
   const allowedExt = options.allowedExt || ALLOWED_EXT;
+  const fsImpl = options.fs || fs;
   const maxUploadMb = options.maxUploadMb
     ?? Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_MB || '50', 10));
 
-  return multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        const input = String(req.query.category || '').trim();
-        const category = sanitizeCategory(input);
-        if (input && category !== input) return cb(new Error('Invalid category'));
+  const storage = {
+    _handleFile(req, file, cb) {
+      const input = String(req.query.category || '').trim();
+      const category = sanitizeCategory(input);
+      if (input && category !== input) return cb(new Error('Invalid category'));
 
-        const targetDir = category ? path.join(audioDir, category) : audioDir;
-        try {
-          fs.mkdirSync(targetDir, { recursive: true });
-          cb(null, targetDir);
-        } catch (err) {
-          cb(err);
-        }
-      },
-      filename: (req, file, cb) => {
-        const fileName = path.basename(file.originalname);
-        const category = sanitizeCategory(String(req.query.category || '').trim());
-        const targetPath = path.join(category ? path.join(audioDir, category) : audioDir, fileName);
-        if (fs.existsSync(targetPath)) {
-          return cb(new Error('A file with the same name already exists'));
-        }
-        cb(null, fileName);
+      const targetDir = category ? path.join(audioDir, category) : audioDir;
+      const fileName = path.basename(file.originalname);
+      const targetPath = path.join(targetDir, fileName);
+      let output;
+      let opened = false;
+
+      try {
+        fsImpl.mkdirSync(targetDir, { recursive: true });
+        output = fsImpl.createWriteStream(targetPath, { flags: 'wx' });
+      } catch (error) {
+        return cb(error);
       }
-    }),
+
+      output.once('open', () => {
+        opened = true;
+      });
+
+      pipeline(file.stream, output, error => {
+        if (!error) {
+          return cb(null, {
+            destination: targetDir,
+            filename: fileName,
+            path: targetPath,
+            size: output.bytesWritten
+          });
+        }
+
+        const uploadError = error.code === 'EEXIST'
+          ? Object.assign(new Error('A file with the same name already exists'), { code: error.code })
+          : error;
+        if (!opened) return cb(uploadError);
+
+        fsImpl.unlink(targetPath, cleanupError => {
+          if (cleanupError && cleanupError.code !== 'ENOENT') {
+            console.warn('Could not remove partial upload:', cleanupError.message);
+          }
+          cb(uploadError);
+        });
+      });
+    },
+
+    _removeFile(_req, file, cb) {
+      fsImpl.unlink(file.path, cb);
+    }
+  };
+
+  return multer({
+    storage,
     limits: {
       fileSize: maxUploadMb * 1024 * 1024
     },

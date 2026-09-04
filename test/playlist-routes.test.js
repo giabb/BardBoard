@@ -96,6 +96,23 @@ describe('playlist API', () => {
     });
   });
 
+  test('concurrent playlist additions preserve every track', async () => {
+    const service = createPlaylistService();
+
+    await callPlaylistApi(service, async baseUrl => {
+      const add = fileName => request(baseUrl, '/playlist/add', {
+        method: 'POST',
+        body: { channelId: CHANNEL_ID, fileName }
+      });
+      const responses = await Promise.all([add('one.mp3'), add('two.mp3'), add('three.mp3')]);
+
+      assert.equal(responses.every(response => response.status === 200), true);
+      const finalQueue = service.getQueue(CHANNEL_ID);
+      assert.equal(finalQueue.length, 3);
+      assert.deepEqual(new Set(finalQueue), new Set(['one.mp3', 'two.mp3', 'three.mp3']));
+    });
+  });
+
   test('POST /playlist/add rejects unsafe filenames without touching the queue', async () => {
     const service = createPlaylistService();
 

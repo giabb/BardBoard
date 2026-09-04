@@ -41,6 +41,10 @@ function currentItems(values = {}) {
   }));
 }
 
+function createFsError(code, message = code) {
+  return Object.assign(new Error(message), { code });
+}
+
 describe('path and request validation', () => {
   test('resolveAudioPathFrom confines paths to the configured audio directory', () => {
     const base = path.resolve(os.tmpdir(), 'bardboard-audio-root');
@@ -114,5 +118,23 @@ describe('environment configuration', () => {
     assert.deepEqual(writeConfig({ DISCORD_TOKEN: 'new' }), ['DISCORD_TOKEN']);
     assert.match(fs.readFileSync(envPath, 'utf8'), /^# custom\nDISCORD_TOKEN=new\nEXTRA=value\n$/);
     assert.deepEqual(writeConfig({ DISCORD_TOKEN: 'new' }), []);
+  });
+
+  test('writeConfig keeps the previous config when the atomic replace fails', () => {
+    const envPath = useTemporaryEnv();
+    const original = '# keep this file intact\nDISCORD_TOKEN=old\n';
+    fs.writeFileSync(envPath, original, 'utf8');
+    const failingFs = Object.assign(Object.create(fs), {
+      renameSync: () => {
+        throw createFsError('EIO', 'simulated replace failure');
+      }
+    });
+
+    assert.throws(
+      () => writeConfig({ DISCORD_TOKEN: 'new' }, { fs: failingFs }),
+      error => error.code === 'EIO'
+    );
+    assert.equal(fs.readFileSync(envPath, 'utf8'), original);
+    assert.deepEqual(fs.readdirSync(path.dirname(envPath)), ['.env']);
   });
 });

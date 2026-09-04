@@ -12,7 +12,7 @@
     "start:web": "next start",
     "lint": "eslint .",
     "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=70 --test-coverage-functions=85",
     "test:e2e": "npm run build && playwright test",
     "test:docker": "node test-support/docker-smoke.js"
   },

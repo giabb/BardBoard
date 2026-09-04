@@ -98,24 +98,89 @@ Audio files and sessions are mounted from the project folder:
 ./sessions    -> /usr/src/app/sessions
 ```
 
+The production image runs as the unprivileged `node` user (UID/GID `1000`) and
+both services enable a small init process plus `no-new-privileges`. On Linux,
+make sure the bind-mounted directories are writable before the first start:
+
+```bash
+mkdir -p audio-files sessions
+sudo chown -R 1000:1000 audio-files sessions
+```
+
+Only the bot container reads the optional host `.env`; the web container receives
+only its proxy URL and port, so Discord tokens and login credentials are not copied
+into the public-facing process environment.
+
 ### Optional Docker `.env`
 
-A host `.env` file is optional. Use it only when you want to change values before containers start, especially ports and build-time web proxy settings.
+A host `.env` file is optional. Compose uses it for port interpolation and the bot
+can use its values to seed a missing config volume. After first-run setup, change
+application settings from the admin UI because the persisted config volume takes
+precedence.
 
 Example:
 
 ```env
 WEB_PORT=3000
 BOT_PORT=3001
-BACKEND_URL=http://localhost:3001
 UPLOAD_MAX_MB=50
 ```
 
-If you change `WEB_PORT`, `BOT_PORT`, `BACKEND_URL`, or `UPLOAD_MAX_MB`, rebuild:
+If you change a port, recreate the containers:
 
 ```bash
 docker compose up --build -d
 ```
+
+### Docker Health, Recovery, and Logs
+
+Both services have health checks and restart automatically after a crash or host
+restart. The bot handles `SIGTERM`/`SIGINT` by stopping HTTP traffic, Discord audio,
+FFmpeg processes, voice connections, and the Discord client before exiting.
+
+```bash
+docker compose ps
+docker compose restart bard-board-bot
+docker compose logs -f --tail=200
+```
+
+Docker JSON logs rotate at `10 MB`, retaining three files per service, so an
+unattended installation cannot grow a single container log indefinitely.
+
+### Backup and Restore Docker Data
+
+The config backup contains the Discord token and account credentials. Keep the
+`backups` directory private; it is excluded from Git. For a consistent PowerShell
+backup, briefly stop both services and copy the named volume plus bind-mounted data:
+
+```powershell
+$BackupDir = "backups/$(Get-Date -Format yyyyMMdd-HHmmss)"
+New-Item -ItemType Directory -Force "$BackupDir/config" | Out-Null
+docker compose stop
+docker compose cp bard-board-bot:/usr/src/app/config/. "$BackupDir/config"
+Copy-Item audio-files "$BackupDir/audio-files" -Recurse -Force
+if (Test-Path sessions) { Copy-Item sessions "$BackupDir/sessions" -Recurse -Force }
+docker compose start
+```
+
+Restore only from a trusted backup. The following replaces the current audio and
+session directories and the persisted configuration:
+
+```powershell
+$BackupDir = "backups/20260904-120000" # Select the backup explicitly.
+docker compose down
+Remove-Item audio-files -Recurse -Force
+Copy-Item "$BackupDir/audio-files" audio-files -Recurse -Force
+if (Test-Path sessions) { Remove-Item sessions -Recurse -Force }
+if (Test-Path "$BackupDir/sessions") { Copy-Item "$BackupDir/sessions" sessions -Recurse -Force }
+docker compose create bard-board-bot
+docker compose cp "$BackupDir/config/." bard-board-bot:/usr/src/app/config
+docker compose run --rm --no-deps --user root bard-board-bot chown -R node:node /usr/src/app/config
+docker compose up -d --wait
+```
+
+On Linux, reapply UID/GID `1000` to restored `audio-files` and `sessions`. Run
+`docker compose ps` afterwards and confirm both services report `healthy`.
 
 ### Reset Docker First-Run Setup
 
@@ -359,6 +424,13 @@ Generate a source coverage report with:
 npm run test:coverage
 ```
 
+The coverage command also enforces minimum project-wide thresholds of 90% for
+lines, 70% for branches, and 85% for functions. The CI fails if a change drops
+below any of these gates. Process-lifecycle tests exercise production restart and
+graceful signal handling, while filesystem and concurrency tests cover atomic
+config writes, partial uploads, simultaneous uploads, file mutations, playlists,
+and session creation.
+
 Run the Chromium end-to-end tests with:
 
 ```bash
@@ -383,9 +455,16 @@ npm run test:docker
 
 This smoke test validates the Compose configuration, builds the production image,
 starts the API and web containers under an isolated project name, waits for both
-health checks, and calls `/api/health` through the web proxy. It chooses a free web
-port automatically and removes its containers, network, volume, and temporary session
-directory when finished. Docker with Compose must be running.
+health checks, and calls `/api/health` through the web proxy. It also verifies the
+non-root user, secret isolation, init/security and log settings, graceful restart,
+automatic recovery after forced container termination, and a real config-volume
+backup/restore cycle. It chooses a free web port automatically and removes its
+containers, network, volume, and temporary files when finished. Docker with Compose
+must be running.
+
+GitHub Actions runs unit/API tests, lint, a production dependency audit, Chromium
+end-to-end tests, this Docker smoke test, and a blocking Trivy scan for fixable high
+or critical image vulnerabilities on every push and pull request.
 
 The project uses:
 

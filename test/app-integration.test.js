@@ -78,6 +78,26 @@ describe('complete Express application', { concurrency: false }, () => {
     });
   });
 
+  test('concurrent logins persist independent authenticated sessions', async () => {
+    await withTestServer(app, async baseUrl => {
+      const logins = await Promise.all(Array.from({ length: 8 }, () => fetch(`${baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin-secret', remember: true })
+      })));
+      assert.equal(logins.every(response => response.status === 200), true);
+
+      const cookies = logins.map(response => response.headers.get('set-cookie')?.split(';', 1)[0]);
+      assert.equal(cookies.every(Boolean), true);
+      assert.equal(new Set(cookies).size, cookies.length);
+
+      const statuses = await Promise.all(cookies.map(cookie => fetch(`${baseUrl}/auth/status`, {
+        headers: { cookie }
+      }).then(response => response.json())));
+      assert.equal(statuses.every(status => status.authenticated && status.role === 'admin'), true);
+    });
+  });
+
   test('readonly users can use the bot but cannot manage settings', async () => {
     await withTestServer(app, async baseUrl => {
       const client = createCookieClient(baseUrl);

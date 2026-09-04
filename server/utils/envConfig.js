@@ -141,6 +141,27 @@ function getEffectiveDefaults() {
   };
 }
 
+function writeFileAtomically(filePath, contents, fsImpl = fs) {
+  const tempPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`
+  );
+
+  try {
+    fsImpl.writeFileSync(tempPath, contents, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    fsImpl.renameSync(tempPath, filePath);
+  } catch (error) {
+    try {
+      fsImpl.rmSync(tempPath, { force: true });
+    } catch (cleanupError) {
+      if (cleanupError.code !== 'ENOENT') {
+        console.warn('Could not remove temporary config file:', cleanupError.message);
+      }
+    }
+    throw error;
+  }
+}
+
 function ensureEnvFile() {
   const envPath = getEnvFilePath();
   const defaults = getEffectiveDefaults();
@@ -182,7 +203,7 @@ function ensureEnvFile() {
 
     const lines = orderedKeys.map(key => `${key}=${quoteIfNeeded(values[key] ?? '')}`);
     const normalized = `${lines.join('\n')}\n`;
-    fs.writeFileSync(envPath, normalized, 'utf8');
+    writeFileAtomically(envPath, normalized);
   }
 }
 
@@ -252,9 +273,10 @@ function validateInput(inputValues, currentItems) {
   return { values: out };
 }
 
-function writeConfig(updatedValues) {
+function writeConfig(updatedValues, options = {}) {
+  const fsImpl = options.fs || fs;
   const envPath = getEnvFilePath();
-  const before = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+  const before = fsImpl.existsSync(envPath) ? fsImpl.readFileSync(envPath, 'utf8') : '';
   const parsed = parseEnvLines(before);
   const lines = parsed.lines.length ? [...parsed.lines] : [];
   const changedKeys = [];
@@ -284,7 +306,7 @@ function writeConfig(updatedValues) {
 
   const normalized = `${lines.join('\n').replace(/\n*$/, '')}\n`;
   if (normalized !== before) {
-    fs.writeFileSync(envPath, normalized, 'utf8');
+    writeFileAtomically(envPath, normalized, fsImpl);
   }
 
   return changedKeys;

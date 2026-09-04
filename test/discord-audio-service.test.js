@@ -309,6 +309,35 @@ describe('Discord audio service', () => {
     assert.equal(service.isPlaying(CHANNEL_ONE), false);
   });
 
+  test('shutdown releases every playback resource and clears guild state', async () => {
+    const { service, players, connections, resources, transcoders } = createHarness();
+    service.setCurrentVolume(CHANNEL_ONE, 0.8);
+    service.toggleRepeat(CHANNEL_ONE);
+    service.addToQueue(CHANNEL_ONE, 'queued.mp3');
+    await service.playAudioInDiscord('song.mp3', CHANNEL_ONE);
+    await service.seek(CHANNEL_ONE, 2);
+
+    service.shutdown();
+    service.shutdown();
+
+    assert.equal(players[0].stopCalls, 1);
+    assert.equal(connections[0].destroyed, true);
+    assert.deepEqual(transcoders[0].kill.calls, [[]]);
+    assert.deepEqual(resources.at(-1).playStream.destroy.calls, [[]]);
+    assert.equal(service.isPlaying(CHANNEL_ONE), false);
+    assert.deepEqual(service.getVolume(CHANNEL_ONE), { volume: 0.5 });
+    assert.deepEqual(service.getRepeatStatus(CHANNEL_ONE), { repeatEnabled: false });
+    assert.deepEqual(service.getQueue(CHANNEL_ONE), []);
+    assert.equal(service.isFileInUse('queued.mp3'), false);
+    assert.deepEqual(await service.nowPlaying(CHANNEL_ONE), {
+      song: null,
+      elapsed: 0,
+      duration: 0,
+      paused: false,
+      playing: false
+    });
+  });
+
   test('tracks and categories in playback or queues are marked in use', async () => {
     const { service } = createHarness();
     service.addToQueue(CHANNEL_ONE, 'Combat/queued.mp3');

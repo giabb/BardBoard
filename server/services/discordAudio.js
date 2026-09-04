@@ -59,16 +59,20 @@ function createDiscordAudioService(discordClient, dependencies = {}) {
   function cleanupPlayerOnly(guildId) {
     const player = activeAudioPlayers.get(guildId);
     if (player) {
-      player.stop();
-      player.removeAllListeners();
-      activeAudioPlayers.delete(guildId);
-      releasePlaybackHandles(guildId);
-      currentAudioFile.delete(guildId);
-      playbackOffsets.delete(guildId);
-      pausedState.delete(guildId);
-      pausedElapsed.delete(guildId);
-      playbackMode.delete(guildId);
+      try {
+        player.stop();
+        player.removeAllListeners();
+      } catch (error) {
+        console.warn('Error stopping audio player:', error.message);
+      }
     }
+    activeAudioPlayers.delete(guildId);
+    releasePlaybackHandles(guildId);
+    currentAudioFile.delete(guildId);
+    playbackOffsets.delete(guildId);
+    pausedState.delete(guildId);
+    pausedElapsed.delete(guildId);
+    playbackMode.delete(guildId);
   }
 
   function cleanupResources(guildId) {
@@ -81,10 +85,42 @@ function createDiscordAudioService(discordClient, dependencies = {}) {
       } catch (error) {
         console.error('Error destroying connection:', error);
       }
-      activeConnections.delete(guildId);
-      repeatEnabled.delete(guildId);
-      currentAudioFile.delete(guildId);
     }
+    activeConnections.delete(guildId);
+    repeatEnabled.delete(guildId);
+    currentAudioFile.delete(guildId);
+  }
+
+  function shutdown() {
+    const guildIds = new Set([
+      ...activeAudioPlayers.keys(),
+      ...activeConnections.keys(),
+      ...repeatEnabled.keys(),
+      ...currentAudioFile.keys(),
+      ...currentVolume.keys(),
+      ...activeAudioResources.keys(),
+      ...activeTranscoders.keys(),
+      ...playbackOffsets.keys(),
+      ...pausedState.keys(),
+      ...pausedElapsed.keys(),
+      ...playbackMode.keys(),
+      ...queueByGuild.keys()
+    ]);
+
+    guildIds.forEach(cleanupResources);
+    activeAudioPlayers.clear();
+    activeConnections.clear();
+    repeatEnabled.clear();
+    currentAudioFile.clear();
+    currentVolume.clear();
+    activeAudioResources.clear();
+    activeTranscoders.clear();
+    playbackOffsets.clear();
+    trackDurations.clear();
+    pausedState.clear();
+    pausedElapsed.clear();
+    playbackMode.clear();
+    queueByGuild.clear();
   }
 
   function releasePlaybackHandles(guildId) {
@@ -662,7 +698,8 @@ function createDiscordAudioService(discordClient, dependencies = {}) {
     seek,
     nowPlaying,
     isFileInUse,
-    isCategoryInUse
+    isCategoryInUse,
+    shutdown
   };
 }
 

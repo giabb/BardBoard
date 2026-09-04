@@ -27,6 +27,7 @@ function createFileRoutes(audioService, options = {}) {
   const router = express.Router();
   const audioDir = path.resolve(options.audioDir || AUDIO_DIR);
   const uploadMiddleware = options.upload || upload;
+  const fsImpl = options.fs || fs;
   const resolveAudioPath = relativePath => resolveAudioPathFrom(audioDir, relativePath);
   const limiter = rateLimit({
     windowMs: 60 * 1000,
@@ -49,7 +50,7 @@ function createFileRoutes(audioService, options = {}) {
 
     let entries = [];
     try {
-      entries = fs.readdirSync(baseDir, { withFileTypes: true });
+      entries = fsImpl.readdirSync(baseDir, { withFileTypes: true });
     } catch (e) {
       console.error('Could not read audio-files directory:', e);
       return res.json({ root: [], categories: {} });
@@ -63,7 +64,7 @@ function createFileRoutes(audioService, options = {}) {
       } else if (entry.isDirectory()) {
         const subDirPath = path.join(baseDir, entry.name);
         try {
-          const subFiles = fs.readdirSync(subDirPath)
+          const subFiles = fsImpl.readdirSync(subDirPath)
             .filter(f => hasAllowedExt(f))
             .map(f => `${entry.name}/${f}`);
           response.categories[entry.name] = subFiles;
@@ -84,7 +85,13 @@ function createFileRoutes(audioService, options = {}) {
    */
   router.post('/upload-audio', (req, res) => {
     uploadMiddleware.single('file')(req, res, err => {
-      if (err) return res.status(400).json({ error: err.message });
+      if (err) {
+        if (['EACCES', 'EIO', 'ENOSPC', 'EROFS'].includes(err.code)) {
+          console.error('Upload failed:', err);
+          return res.status(500).json({ error: 'Upload failed' });
+        }
+        return res.status(400).json({ error: err.message });
+      }
       if (!req.file) return res.status(400).json({ error: 'Missing file' });
       return res.json({ ok: true, file: req.file.filename });
     });
@@ -108,10 +115,10 @@ function createFileRoutes(audioService, options = {}) {
     if (!fullPath) return res.status(400).json({ error: 'Invalid path' });
 
     try {
-      const stat = fs.statSync(fullPath);
+      const stat = fsImpl.statSync(fullPath);
       if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
       if (!hasAllowedExt(fullPath)) return res.status(400).json({ error: 'Invalid file type' });
-      fs.unlinkSync(fullPath);
+      fsImpl.unlinkSync(fullPath);
       return res.json({ ok: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
@@ -170,21 +177,36 @@ function createFileRoutes(audioService, options = {}) {
     }
 
     try {
-      const sourceStat = fs.statSync(sourceFullPath);
+      const sourceStat = fsImpl.statSync(sourceFullPath);
       if (!sourceStat.isFile()) return res.status(400).json({ error: 'Not a file' });
 
-      if (targetCategory && createCategory && !fs.existsSync(targetDirPath)) {
-        fs.mkdirSync(targetDirPath, { recursive: false });
+      let createdTargetCategory = false;
+      if (targetCategory && createCategory && !fsImpl.existsSync(targetDirPath)) {
+        fsImpl.mkdirSync(targetDirPath, { recursive: false });
+        createdTargetCategory = true;
       }
 
-      const targetDirStat = fs.statSync(targetDirPath);
+      const targetDirStat = fsImpl.statSync(targetDirPath);
       if (!targetDirStat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
 
-      if (fs.existsSync(targetFullPath)) {
+      if (fsImpl.existsSync(targetFullPath)) {
         return res.status(409).json({ error: 'A file with the same name already exists in target category' });
       }
 
-      fs.renameSync(sourceFullPath, targetFullPath);
+      try {
+        fsImpl.renameSync(sourceFullPath, targetFullPath);
+      } catch (error) {
+        if (createdTargetCategory) {
+          try {
+            fsImpl.rmdirSync(targetDirPath);
+          } catch (cleanupError) {
+            if (cleanupError.code !== 'ENOENT' && cleanupError.code !== 'ENOTEMPTY') {
+              console.warn('Could not roll back target category:', cleanupError.message);
+            }
+          }
+        }
+        throw error;
+      }
       return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'File or category not found' });
@@ -238,14 +260,14 @@ function createFileRoutes(audioService, options = {}) {
     }
 
     try {
-      const sourceStat = fs.statSync(sourceFullPath);
+      const sourceStat = fsImpl.statSync(sourceFullPath);
       if (!sourceStat.isFile()) return res.status(400).json({ error: 'Not a file' });
 
-      if (fs.existsSync(targetFullPath)) {
+      if (fsImpl.existsSync(targetFullPath)) {
         return res.status(409).json({ error: 'A file with the same name already exists' });
       }
 
-      fs.renameSync(sourceFullPath, targetFullPath);
+      fsImpl.renameSync(sourceFullPath, targetFullPath);
       return res.json({ ok: true, from: sourceRelPath, to: targetRelPath, changed: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
@@ -272,10 +294,10 @@ function createFileRoutes(audioService, options = {}) {
 
     const dirPath = resolveAudioPath(name);
     if (!dirPath || dirPath === audioDir) return res.status(400).json({ error: 'Invalid category' });
-    if (fs.existsSync(dirPath)) return res.status(409).json({ error: 'Category already exists' });
+    if (fsImpl.existsSync(dirPath)) return res.status(409).json({ error: 'Category already exists' });
 
     try {
-      fs.mkdirSync(dirPath, { recursive: false });
+      fsImpl.mkdirSync(dirPath, { recursive: false });
       return res.json({ ok: true, name });
     } catch (err) {
       if (err && err.code === 'EEXIST') return res.status(409).json({ error: 'Category already exists' });
@@ -303,9 +325,9 @@ function createFileRoutes(audioService, options = {}) {
     }
 
     try {
-      const stat = fs.statSync(dirPath);
+      const stat = fsImpl.statSync(dirPath);
       if (!stat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
-      fs.rmSync(dirPath, { recursive: true, force: true });
+      fsImpl.rmSync(dirPath, { recursive: true, force: true });
       return res.json({ ok: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'Category not found' });
@@ -343,14 +365,14 @@ function createFileRoutes(audioService, options = {}) {
     if (!targetDirPath || targetDirPath === audioDir) return res.status(400).json({ error: 'Invalid target category' });
 
     try {
-      const sourceStat = fs.statSync(sourceDirPath);
+      const sourceStat = fsImpl.statSync(sourceDirPath);
       if (!sourceStat.isDirectory()) return res.status(400).json({ error: 'Not a category' });
 
-      if (fs.existsSync(targetDirPath)) {
+      if (fsImpl.existsSync(targetDirPath)) {
         return res.status(409).json({ error: 'Category already exists' });
       }
 
-      fs.renameSync(sourceDirPath, targetDirPath);
+      fsImpl.renameSync(sourceDirPath, targetDirPath);
       return res.json({ ok: true, from: sourceName, to: targetName, changed: true });
     } catch (err) {
       if (err && err.code === 'ENOENT') return res.status(404).json({ error: 'Category not found' });

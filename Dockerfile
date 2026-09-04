@@ -25,7 +25,7 @@ RUN apk add --no-cache \
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 FROM node:24-alpine AS build
 
@@ -51,12 +51,17 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY --from=build /usr/src/app/.next ./.next
 COPY --from=build /usr/src/app/next.config.js ./next.config.js
 COPY --from=build /usr/src/app/public ./public
 COPY server/ ./server/
+
+RUN mkdir -p /usr/src/app/audio-files /usr/src/app/sessions /usr/src/app/config \
+    && chown -R node:node /usr/src/app/audio-files /usr/src/app/sessions /usr/src/app/config /usr/src/app/.next
+
+USER node
 
 CMD ["node", "server/app.js"]
 

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { Writable } = require('node:stream');
 const { describe, test } = require('node:test');
 const createFileRoutes = require('../server/routes/files');
 const { createUpload } = require('../server/middleware/upload');
@@ -25,9 +26,18 @@ async function withAudioDir(callback) {
 }
 
 async function callFileApi(audioDir, service, callback, options = {}) {
-  const upload = createUpload({ audioDir, maxUploadMb: options.maxUploadMb ?? 1 });
-  const router = createFileRoutes(service, { audioDir, upload });
+  const fsImpl = options.fs || fs;
+  const upload = createUpload({ audioDir, fs: fsImpl, maxUploadMb: options.maxUploadMb ?? 1 });
+  const router = createFileRoutes(service, { audioDir, fs: fsImpl, upload });
   await withTestServer(router, callback);
+}
+
+function createFsError(code, message = code) {
+  return Object.assign(new Error(message), { code });
+}
+
+function withFsOverrides(overrides) {
+  return Object.assign(Object.create(fs), overrides);
 }
 
 function post(body) {
@@ -161,43 +171,162 @@ describe('file and category API', () => {
       fs.writeFileSync(path.join(audioDir, 'delete.mp3'), 'audio');
       fs.writeFileSync(path.join(audioDir, 'move.mp3'), 'audio');
       fs.mkdirSync(path.join(audioDir, 'Music'));
-      const originalUnlink = fs.unlinkSync;
-      const originalRename = fs.renameSync;
-
-      fs.unlinkSync = target => {
+      const failingFs = withFsOverrides({
+        unlinkSync: target => {
         if (target === path.join(audioDir, 'delete.mp3')) {
-          const error = new Error('locked');
-          error.code = 'EPERM';
-          throw error;
+            throw createFsError('EPERM', 'locked');
+          }
+          return fs.unlinkSync(target);
+        },
+        renameSync: (source, target) => {
+          if (source === path.join(audioDir, 'move.mp3')) {
+            throw createFsError('EBUSY', 'busy');
+          }
+          return fs.renameSync(source, target);
         }
-        return originalUnlink(target);
-      };
-      fs.renameSync = (source, target) => {
-        if (source === path.join(audioDir, 'move.mp3')) {
-          const error = new Error('busy');
-          error.code = 'EBUSY';
-          throw error;
+      });
+
+      await callFileApi(audioDir, createAudioService(), async baseUrl => {
+        assert.deepEqual(
+          await request(baseUrl, '/audio-file?path=delete.mp3', { method: 'DELETE' }),
+          { status: 409, body: { error: 'File is currently in use' } }
+        );
+        assert.deepEqual(
+          await request(baseUrl, '/audio-file/move', post({
+            path: 'move.mp3', targetCategory: 'Music'
+          })),
+          { status: 409, body: { error: 'File is currently in use' } }
+        );
+      }, { fs: failingFs });
+    });
+  });
+
+  test('filesystem failures preserve source files and roll back partial changes', async () => {
+    await withAudioDir(async audioDir => {
+      const deletePath = path.join(audioDir, 'delete.mp3');
+      const movePath = path.join(audioDir, 'move.mp3');
+      const renamePath = path.join(audioDir, 'rename.mp3');
+      fs.writeFileSync(deletePath, 'delete-original');
+      fs.writeFileSync(movePath, 'move-original');
+      fs.writeFileSync(renamePath, 'rename-original');
+
+      const failingFs = withFsOverrides({
+        unlinkSync: target => {
+          if (target === deletePath) throw createFsError('EIO', 'disk failure');
+          return fs.unlinkSync(target);
+        },
+        renameSync: (source, target) => {
+          if (source === movePath) throw createFsError('ENOSPC', 'disk full');
+          if (source === renamePath) throw createFsError('EACCES', 'permission denied');
+          return fs.renameSync(source, target);
         }
-        return originalRename(source, target);
-      };
+      });
+      const originalError = console.error;
+      console.error = () => {};
 
       try {
         await callFileApi(audioDir, createAudioService(), async baseUrl => {
           assert.deepEqual(
             await request(baseUrl, '/audio-file?path=delete.mp3', { method: 'DELETE' }),
-            { status: 409, body: { error: 'File is currently in use' } }
+            { status: 500, body: { error: 'Delete failed' } }
           );
           assert.deepEqual(
             await request(baseUrl, '/audio-file/move', post({
-              path: 'move.mp3', targetCategory: 'Music'
+              path: 'move.mp3', targetCategory: 'CreatedThenRolledBack', createCategory: true
             })),
-            { status: 409, body: { error: 'File is currently in use' } }
+            { status: 500, body: { error: 'Move failed' } }
           );
-        });
+          assert.deepEqual(
+            await request(baseUrl, '/audio-file/rename', post({ path: 'rename.mp3', newName: 'changed' })),
+            { status: 500, body: { error: 'Rename failed' } }
+          );
+        }, { fs: failingFs });
       } finally {
-        fs.unlinkSync = originalUnlink;
-        fs.renameSync = originalRename;
+        console.error = originalError;
       }
+
+      assert.equal(fs.readFileSync(deletePath, 'utf8'), 'delete-original');
+      assert.equal(fs.readFileSync(movePath, 'utf8'), 'move-original');
+      assert.equal(fs.readFileSync(renamePath, 'utf8'), 'rename-original');
+      assert.equal(fs.existsSync(path.join(audioDir, 'CreatedThenRolledBack')), false);
+      assert.equal(fs.existsSync(path.join(audioDir, 'changed.mp3')), false);
+    });
+  });
+
+  test('a failed upload removes its partial file', async () => {
+    await withAudioDir(async audioDir => {
+      const failingFs = withFsOverrides({
+        createWriteStream: target => {
+          const output = new Writable({
+            write(chunk, _encoding, callback) {
+              fs.writeFileSync(target, chunk.subarray(0, 1));
+              callback(createFsError('ENOSPC', 'disk full'));
+            }
+          });
+          process.nextTick(() => output.emit('open', 1));
+          return output;
+        }
+      });
+      const originalError = console.error;
+      console.error = () => {};
+
+      try {
+        await callFileApi(audioDir, createAudioService(), async baseUrl => {
+          const form = new FormData();
+          form.append('file', new Blob(['partial audio']), 'partial.mp3');
+          assert.deepEqual(
+            await request(baseUrl, '/upload-audio', { method: 'POST', body: form }),
+            { status: 500, body: { error: 'Upload failed' } }
+          );
+        }, { fs: failingFs });
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.equal(fs.existsSync(path.join(audioDir, 'partial.mp3')), false);
+    });
+  });
+
+  test('concurrent uploads reserve a filename atomically', async () => {
+    await withAudioDir(async audioDir => {
+      await callFileApi(audioDir, createAudioService(), async baseUrl => {
+        const upload = contents => {
+          const form = new FormData();
+          form.append('file', new Blob([contents]), 'same-name.mp3');
+          return request(baseUrl, '/upload-audio', { method: 'POST', body: form });
+        };
+        const responses = await Promise.all([upload('first'), upload('second')]);
+
+        assert.deepEqual(responses.map(response => response.status).sort(), [200, 400]);
+        assert.equal(
+          responses.some(response => response.body?.error === 'A file with the same name already exists'),
+          true
+        );
+        assert.equal(['first', 'second'].includes(
+          fs.readFileSync(path.join(audioDir, 'same-name.mp3'), 'utf8')
+        ), true);
+      });
+    });
+  });
+
+  test('concurrent rename and delete leave one consistent outcome', async () => {
+    await withAudioDir(async audioDir => {
+      fs.writeFileSync(path.join(audioDir, 'race.mp3'), 'original');
+
+      await callFileApi(audioDir, createAudioService(), async baseUrl => {
+        const [renameResponse, deleteResponse] = await Promise.all([
+          request(baseUrl, '/audio-file/rename', post({ path: 'race.mp3', newName: 'renamed' })),
+          request(baseUrl, '/audio-file?path=race.mp3', { method: 'DELETE' })
+        ]);
+        assert.deepEqual([renameResponse.status, deleteResponse.status].sort(), [200, 404]);
+
+        const remaining = fs.readdirSync(audioDir).filter(name => name.endsWith('.mp3'));
+        assert.equal(remaining.length <= 1, true);
+        if (remaining.length === 1) {
+          assert.deepEqual(remaining, ['renamed.mp3']);
+          assert.equal(fs.readFileSync(path.join(audioDir, remaining[0]), 'utf8'), 'original');
+        }
+      });
     });
   });
 

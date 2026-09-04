@@ -39,6 +39,7 @@ sessions/
 coverage/
 .e2e-runtime/
 .docker-smoke-runtime/
+backups/
 playwright-report/
 test-results/
 blob-report/
