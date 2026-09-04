@@ -49,6 +49,7 @@ async function startProductionServer() {
     'AUTH_ADMIN_USER=admin',
     'AUTH_ADMIN_PASS=admin-secret',
     'SESSION_SECRET=lifecycle-test-secret',
+    'BOT_PORT=1',
     `SESSION_DIR=${sessionDir}`,
     'RATE_LIMIT_AUDIO=1000',
     'RATE_LIMIT_AUDIO_STATUS=1000',

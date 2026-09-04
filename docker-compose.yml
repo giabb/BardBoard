@@ -28,6 +28,7 @@ services:
       context: .
       args:
         BACKEND_URL: http://bard-board-bot:${BOT_PORT:-3001}
+        UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
     image: bardboard:local
     container_name: ${WEB_CONTAINER_NAME:-web}
     command: ["node", "node_modules/next/dist/bin/next", "start"]
@@ -69,9 +70,11 @@ services:
       - BARDBOARD_ENV_PATH=/usr/src/app/config/.env
       - BACKEND_URL=http://localhost:3001
       - BOT_PORT=${BOT_PORT:-3001}
+      - UPLOAD_MAX_MB=${UPLOAD_MAX_MB:-50}
+      - SESSION_DIR=/usr/src/app/sessions
     volumes:
       - ./audio-files:/usr/src/app/audio-files
-      - ${SESSION_DIR:-./sessions}:/usr/src/app/sessions
+      - ${SESSION_HOST_DIR:-./sessions}:/usr/src/app/sessions
       - bardboard-config:/usr/src/app/config
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.BOT_PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]

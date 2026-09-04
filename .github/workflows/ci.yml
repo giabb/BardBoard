@@ -30,11 +30,11 @@ jobs:
         timeout-minutes: 10
         run: npm ci --no-audit --no-fund --prefer-offline --fetch-retries=2 --fetch-timeout=60000
 
-      - name: Run unit and API tests with coverage gates
-        run: npm run test:coverage
-
       - name: Run lint
         run: npm run lint
+
+      - name: Run unit and API tests with coverage gates
+        run: npm run test:coverage
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high

@@ -7,13 +7,15 @@ BardBoard lets you play sound effects, music, and voice lines into a Discord voi
 [![License](https://img.shields.io/badge/License-GPL%203.0-B91C1C.svg)](LICENSE.md)
 [![Discord](https://img.shields.io/badge/Made%20for-Discord-5865F2.svg)](https://discord.com)
 [![Docker](https://img.shields.io/badge/Runs%20on-Docker-0EA5E9.svg)](https://docker.com)
+[![CI](https://github.com/giabb/BardBoard/actions/workflows/ci.yml/badge.svg)](https://github.com/giabb/BardBoard/actions/workflows/ci.yml)
 [![Node 24](https://img.shields.io/badge/node-24-16A34A?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-orange?logo=next.js&logoColor=white)](https://nextjs.org)
 
-![BardBoard GUI](https://i.ibb.co/TqYC52jD/bardboard21.png)
+![BardBoard GUI](docs/assets/bardboard.png)
 
 ## Contents
 
+- [Quick Start](#quick-start)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Discord Bot Setup](#discord-bot-setup)
@@ -24,7 +26,20 @@ BardBoard lets you play sound effects, music, and voice lines into a Discord voi
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [Contributing](#contributing)
 - [License](#license)
+
+## Quick Start
+
+After creating and inviting a [Discord bot](#discord-bot-setup), start BardBoard
+from the repository root:
+
+```bash
+docker compose up --build -d --wait
+```
+
+Open `http://localhost:3000`, enter the bot token and admin credentials on the
+setup page, then save. The containers restart automatically when required.
 
 ## Features
 
@@ -37,7 +52,7 @@ BardBoard lets you play sound effects, music, and voice lines into a Discord voi
 - Drag tracks between categories to move files on disk.
 - Create categories manually or by dragging a track to the "New Category" drop zone.
 - Rename or delete tracks and categories from the UI.
-- Optional admin and readonly authentication.
+- Required admin authentication with an optional readonly account.
 - First-run setup page: no manual `.env` file is required for Docker.
 - Swagger UI at `/api-docs`.
 
@@ -74,7 +89,7 @@ The Docker setup does not require a host `.env` file. On first start, BardBoard 
 3. Start the app:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
 4. Open `http://localhost:3000`.
@@ -113,10 +128,12 @@ into the public-facing process environment.
 
 ### Optional Docker `.env`
 
-A host `.env` file is optional. Compose uses it for port interpolation and the bot
-can use its values to seed a missing config volume. After first-run setup, change
-application settings from the admin UI because the persisted config volume takes
-precedence.
+A host `.env` file is optional. Compose uses it for deployment values and the bot
+can use its values to seed a missing config volume. Explicit deployment values
+(`WEB_PORT`, `BOT_PORT`, `BACKEND_URL`, `UPLOAD_MAX_MB`, and the container session
+path) take precedence over stale values in the persisted file. For bot credentials
+and other application settings, the persisted config volume remains authoritative;
+change them from the admin UI after first-run setup.
 
 Example:
 
@@ -124,12 +141,20 @@ Example:
 WEB_PORT=3000
 BOT_PORT=3001
 UPLOAD_MAX_MB=50
+SESSION_HOST_DIR=./sessions
 ```
 
-If you change a port, recreate the containers:
+`SESSION_HOST_DIR` selects the directory on the Docker host. Inside the bot
+container it is always mounted at `/usr/src/app/sessions`; keep the application
+setting `SESSION_DIR=./sessions` when using Docker. `BACKEND_URL` is configured
+automatically by Compose and normally should not be overridden.
+
+If you change a port or `SESSION_HOST_DIR`, recreate the containers. Changes to
+`UPLOAD_MAX_MB` also require rebuilding the web image because Next.js reads the
+proxy upload limit during its production build:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
 ### Docker Health, Recovery, and Logs
@@ -147,55 +172,126 @@ docker compose logs -f --tail=200
 Docker JSON logs rotate at `10 MB`, retaining three files per service, so an
 unattended installation cannot grow a single container log indefinitely.
 
+### Remote Access and HTTPS
+
+The default Compose setup publishes only the web UI; the bot/API port remains on
+the internal Docker network. Do not publish the bot/API port directly.
+
+`http://localhost:3000` is suitable for access from the Docker host. If BardBoard
+is reachable from another machine or from the internet, place it behind an HTTPS
+reverse proxy and restrict access with a firewall or private network. Login
+credentials and session cookies must not travel over an unencrypted public
+connection.
+
+### Updating the Docker Deployment
+
+Back up the persisted data before an update, then fetch the new code and recreate
+the services from a freshly pulled base image:
+
+```bash
+git pull --ff-only
+docker compose build --pull
+docker compose up -d --wait
+docker compose ps
+```
+
+After confirming that both services are healthy, old unused images can be removed
+manually with `docker image prune` if disk space is needed.
+
 ### Backup and Restore Docker Data
 
 The config backup contains the Discord token and account credentials. Keep the
-`backups` directory private; it is excluded from Git. For a consistent PowerShell
-backup, briefly stop both services and copy the named volume plus bind-mounted data:
+`backups` directory private; it is excluded from Git. For a consistent backup,
+briefly stop both services and copy the named volume plus bind-mounted data.
+
+PowerShell:
 
 ```powershell
 $BackupDir = "backups/$(Get-Date -Format yyyyMMdd-HHmmss)"
+$SessionHostDir = "./sessions" # Match SESSION_HOST_DIR when customized.
 New-Item -ItemType Directory -Force "$BackupDir/config" | Out-Null
 docker compose stop
-docker compose cp bard-board-bot:/usr/src/app/config/. "$BackupDir/config"
-Copy-Item audio-files "$BackupDir/audio-files" -Recurse -Force
-if (Test-Path sessions) { Copy-Item sessions "$BackupDir/sessions" -Recurse -Force }
-docker compose start
+try {
+    docker compose cp bard-board-bot:/usr/src/app/config/. "$BackupDir/config"
+    Copy-Item audio-files "$BackupDir/audio-files" -Recurse -Force
+    if (Test-Path $SessionHostDir) { Copy-Item $SessionHostDir "$BackupDir/sessions" -Recurse -Force }
+} finally {
+    docker compose start
+}
 ```
 
-Restore only from a trusted backup. The following replaces the current audio and
-session directories and the persisted configuration:
+Bash:
+
+```bash
+set -e
+BACKUP_DIR="backups/$(date +%Y%m%d-%H%M%S)"
+SESSION_HOST_DIR="./sessions" # Match SESSION_HOST_DIR when customized.
+mkdir -p "$BACKUP_DIR/config"
+docker compose stop
+trap 'docker compose start' EXIT
+docker compose cp bard-board-bot:/usr/src/app/config/. "$BACKUP_DIR/config"
+cp -a audio-files "$BACKUP_DIR/audio-files"
+if [ -d "$SESSION_HOST_DIR" ]; then cp -a "$SESSION_HOST_DIR" "$BACKUP_DIR/sessions"; fi
+docker compose start
+trap - EXIT
+```
+
+Restore only from a trusted backup. Check that both the configuration and audio
+directories exist before stopping BardBoard. The following commands replace the
+current audio, sessions, and persisted configuration.
+
+PowerShell:
 
 ```powershell
-$BackupDir = "backups/20260904-120000" # Select the backup explicitly.
-docker compose down
-Remove-Item audio-files -Recurse -Force
+$BackupDir = "backups/20260904-120000" # Select an existing backup explicitly.
+$SessionHostDir = "./sessions" # Match SESSION_HOST_DIR when customized.
+if (!(Test-Path "$BackupDir/config") -or !(Test-Path "$BackupDir/audio-files")) {
+    throw "The selected backup is incomplete: $BackupDir"
+}
+docker compose down --volumes
+if (Test-Path audio-files) { Remove-Item audio-files -Recurse -Force }
 Copy-Item "$BackupDir/audio-files" audio-files -Recurse -Force
-if (Test-Path sessions) { Remove-Item sessions -Recurse -Force }
-if (Test-Path "$BackupDir/sessions") { Copy-Item "$BackupDir/sessions" sessions -Recurse -Force }
+if (Test-Path $SessionHostDir) { Remove-Item $SessionHostDir -Recurse -Force }
+if (Test-Path "$BackupDir/sessions") { Copy-Item "$BackupDir/sessions" $SessionHostDir -Recurse -Force }
+if (!(Test-Path $SessionHostDir)) { New-Item -ItemType Directory -Force $SessionHostDir | Out-Null }
 docker compose create bard-board-bot
 docker compose cp "$BackupDir/config/." bard-board-bot:/usr/src/app/config
 docker compose run --rm --no-deps --user root bard-board-bot chown -R node:node /usr/src/app/config
 docker compose up -d --wait
 ```
 
-On Linux, reapply UID/GID `1000` to restored `audio-files` and `sessions`. Run
-`docker compose ps` afterwards and confirm both services report `healthy`.
+Bash:
+
+```bash
+set -e
+BACKUP_DIR="backups/20260904-120000" # Select an existing backup explicitly.
+SESSION_HOST_DIR="./sessions" # Match SESSION_HOST_DIR when customized.
+if [ ! -d "$BACKUP_DIR/config" ] || [ ! -d "$BACKUP_DIR/audio-files" ]; then
+  echo "The selected backup is incomplete: $BACKUP_DIR" >&2
+  exit 1
+fi
+docker compose down --volumes
+rm -rf audio-files "$SESSION_HOST_DIR"
+cp -a "$BACKUP_DIR/audio-files" audio-files
+if [ -d "$BACKUP_DIR/sessions" ]; then cp -a "$BACKUP_DIR/sessions" "$SESSION_HOST_DIR"; fi
+mkdir -p "$SESSION_HOST_DIR"
+docker compose create bard-board-bot
+docker compose cp "$BACKUP_DIR/config/." bard-board-bot:/usr/src/app/config
+docker compose run --rm --no-deps --user root bard-board-bot chown -R node:node /usr/src/app/config
+sudo chown -R 1000:1000 audio-files "$SESSION_HOST_DIR"
+docker compose up -d --wait
+```
+
+Run `docker compose ps` afterwards and confirm both services report `healthy`.
 
 ### Reset Docker First-Run Setup
 
-This deletes the persisted BardBoard config volume. Audio files are not stored in this volume.
+This deletes the persisted BardBoard config volume. Audio files and sessions use
+bind mounts and are not removed by this command.
 
 ```bash
-docker compose down
-docker volume rm bardboardanddragons_bardboard-config
-docker compose up --build -d
-```
-
-The exact volume name can vary if your Compose project name changes. List volumes with:
-
-```bash
-docker volume ls
+docker compose down --volumes
+docker compose up --build -d --wait
 ```
 
 ## Run Locally
@@ -205,7 +301,7 @@ Local development also supports first-run setup. If `.env` is missing, the backe
 1. Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 2. Start the bot/API and web app:
@@ -308,6 +404,11 @@ BardBoard reads configuration from:
 - Local development: `./.env` by default.
 - Custom path: set `BARDBOARD_ENV_PATH`.
 - Process environment variables, used as defaults when generating a missing config file.
+- Explicit deployment environment values for ports, proxying, uploads, and the
+  container session path, which take precedence over persisted values.
+
+`SESSION_HOST_DIR` is a Docker Compose variable rather than an application setting,
+so it is not shown or edited by the BardBoard settings page.
 
 The setup page requires:
 
@@ -326,7 +427,8 @@ The setup page requires:
 | `AUTH_READONLY_PASS` | No | empty | Optional readonly password. | Restart |
 | `SESSION_SECRET` | Recommended | generated | Session signing secret. | Restart |
 | `LOGIN_REMEMBER_DAYS` | No | `30` | Remember-me cookie duration. | Restart |
-| `SESSION_DIR` | No | `./sessions` | Session file storage directory. | Restart |
+| `SESSION_DIR` | No | `./sessions` | Application session path. Keep `./sessions` in Docker. | Restart |
+| `SESSION_HOST_DIR` | No | `./sessions` | Docker host directory mounted for session persistence. | Recreate containers |
 | `NOISES_FOLDER` | No | `!noises` | Category folder used for overlay noises. | Restart |
 | `NOISES_VOLUME` | No | `2` | Overlay noise gain (`1` = original level, `2` = double amplitude; range `0`-`10`). | Restart |
 | `RATE_LIMIT_AUDIO` | No | `120` | Requests/minute for audio actions. | Restart |
@@ -339,10 +441,10 @@ The setup page requires:
 | `SESSION_FILE_RETRY_MIN_MS` | No | `50` | Minimum session retry delay in ms. | Restart |
 | `SESSION_FILE_RETRY_MAX_MS` | No | `200` | Maximum session retry delay in ms. | Restart |
 | `SESSION_WRITE_RETRIES` | No | `6` | Extra retries for transient file-lock races. | Restart |
-| `WEB_PORT` | No | `3000` | Web UI port. | Rebuild container |
-| `BOT_PORT` | No | `3001` | Bot/API port. | Rebuild container |
-| `BACKEND_URL` | No | `http://localhost:3001` | Next.js API proxy target. | Rebuild container |
-| `UPLOAD_MAX_MB` | No | `50` | Max upload size per file in MB. | Rebuild container |
+| `WEB_PORT` | No | `3000` | Web UI port. | Recreate containers |
+| `BOT_PORT` | No | `3001` | Bot/API port. | Recreate containers |
+| `BACKEND_URL` | No | `http://localhost:3001` | Next.js API proxy target; Compose sets it automatically. | Restart locally; Docker-managed |
+| `UPLOAD_MAX_MB` | No | `50` | Max upload size per file in MB. | Rebuild containers |
 | `BARDBOARD_ENV_PATH` | No | varies | Path to the config file. Docker sets this automatically. | Restart |
 
 ## Troubleshooting
@@ -395,16 +497,19 @@ docker compose restart bard-board-bot
 Useful commands:
 
 ```bash
-npm install
+npm ci
 npm run dev
 npm run build
 npm run start
 npm run lint
 npm test
-npm audit
+npm audit --omit=dev --audit-level=high
 ```
 
-### Automated bot API tests
+Use `npm install` instead when intentionally adding, removing, or updating a
+dependency so that npm can update `package-lock.json`.
+
+### Automated Tests
 
 Run the bot API test suite with:
 

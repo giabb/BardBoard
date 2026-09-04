@@ -108,9 +108,10 @@ async function main() {
     ...process.env,
     WEB_PORT: String(webPort),
     BOT_PORT: String(botPort),
+    UPLOAD_MAX_MB: '17',
     WEB_CONTAINER_NAME: `${projectName}-web`,
     BOT_CONTAINER_NAME: `${projectName}-bot`,
-    SESSION_DIR: './.docker-smoke-runtime/sessions'
+    SESSION_HOST_DIR: './.docker-smoke-runtime/sessions'
   };
 
   fs.rmSync(runtimeDir, { recursive: true, force: true });
@@ -131,6 +132,14 @@ async function main() {
     if (runtimeUser !== 'node') throw new Error(`Image runs as unexpected user: ${runtimeUser || '(root)'}`);
     const botUid = compose(['exec', '-T', 'bard-board-bot', 'id', '-u'], env, { capture: true });
     if (botUid !== '1000') throw new Error(`Bot container runs with unexpected UID: ${botUid}`);
+    compose([
+      'exec', '-T', 'bard-board-bot', 'node', '-e',
+      "if(process.env.UPLOAD_MAX_MB!=='17'||process.env.SESSION_DIR!=='/usr/src/app/sessions')process.exit(1)"
+    ], env);
+    compose([
+      'exec', '-T', 'bard-board-web', 'node', '-e',
+      "const c=require('./.next/required-server-files.json').config;if(c.experimental.proxyClientMaxBodySize!==17*1024*1024)process.exit(1)"
+    ], env);
     compose([
       'exec', '-T', 'bard-board-bot', 'node', '-e',
       "const fs=require('node:fs');for(const p of ['/usr/local/bin/npm','/usr/local/bin/yarn'])if(fs.existsSync(p))process.exit(1)"

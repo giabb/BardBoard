@@ -32,7 +32,9 @@ FROM node:24-alpine AS build
 WORKDIR /usr/src/app
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG BACKEND_URL=http://localhost:3001
+ARG UPLOAD_MAX_MB=50
 ENV BACKEND_URL=$BACKEND_URL
+ENV UPLOAD_MAX_MB=$UPLOAD_MAX_MB
 
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY package*.json ./
