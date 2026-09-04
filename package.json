@@ -32,32 +32,32 @@
   "license": "GPL-3.0-or-later",
   "description": "Soundboard for DND sessions (or whatever you like)",
   "dependencies": {
+    "@discordjs/voice": "^0.19.2",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
-    "@discordjs/voice": "^0.19.2",
     "cors": "^2.8.6",
-    "discord.js": "^14.26.4",
+    "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "libsodium-wrappers": "^0.8.4",
-    "multer": "^2.1.1",
-    "music-metadata": "^11.12.3",
-    "next": "^16.2.7",
+    "multer": "^2.3.0",
+    "music-metadata": "^11.15.0",
+    "next": "^16.3.4",
     "opusscript": "^0.1.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "session-file-store": "^1.5.0"
   },
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.28"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
-    "concurrently": "^10.0.3",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.7"
+    "concurrently": "^10.0.5",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4"
   }
 }
