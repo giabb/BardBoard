@@ -131,6 +131,10 @@ async function main() {
     if (runtimeUser !== 'node') throw new Error(`Image runs as unexpected user: ${runtimeUser || '(root)'}`);
     const botUid = compose(['exec', '-T', 'bard-board-bot', 'id', '-u'], env, { capture: true });
     if (botUid !== '1000') throw new Error(`Bot container runs with unexpected UID: ${botUid}`);
+    compose([
+      'exec', '-T', 'bard-board-bot', 'node', '-e',
+      "const fs=require('node:fs');for(const p of ['/usr/local/bin/npm','/usr/local/bin/yarn'])if(fs.existsSync(p))process.exit(1)"
+    ], env);
 
     const webEnvironment = inspectJson(webContainer, '{{json .Config.Env}}', env);
     const forbiddenSecrets = ['DISCORD_TOKEN=', 'AUTH_ADMIN_USER=', 'AUTH_ADMIN_PASS=', 'AUTH_READONLY_USER=', 'AUTH_READONLY_PASS=', 'SESSION_SECRET='];

@@ -44,14 +44,18 @@ RUN npm run build
 
 FROM node:24-alpine
 
-RUN apk add --no-cache ffmpeg
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ffmpeg
 
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund \
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /usr/src/app/.next ./.next
 COPY --from=build /usr/src/app/next.config.js ./next.config.js

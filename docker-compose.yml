@@ -30,7 +30,7 @@ services:
         BACKEND_URL: http://bard-board-bot:${BOT_PORT:-3001}
     image: bardboard:local
     container_name: ${WEB_CONTAINER_NAME:-web}
-    command: ["npm", "run", "start:web"]
+    command: ["node", "node_modules/next/dist/bin/next", "start"]
     ports:
       - "${WEB_PORT:-3000}:${WEB_PORT:-3000}"
     restart: always
