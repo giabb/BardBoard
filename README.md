@@ -5,11 +5,7 @@
 BardBoard lets you play sound effects, music, and voice lines into a Discord voice channel from a clean web interface. It is designed for tabletop sessions, watch parties, and any server where quick audio cues are useful.
 
 [![License](https://img.shields.io/badge/License-GPL%203.0-B91C1C.svg)](LICENSE.md)
-[![Discord](https://img.shields.io/badge/Made%20for-Discord-5865F2.svg)](https://discord.com)
-[![Docker](https://img.shields.io/badge/Runs%20on-Docker-0EA5E9.svg)](https://docker.com)
 [![CI](https://github.com/giabb/BardBoard/actions/workflows/ci.yml/badge.svg)](https://github.com/giabb/BardBoard/actions/workflows/ci.yml)
-[![Node 24](https://img.shields.io/badge/node-24-16A34A?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-orange?logo=next.js&logoColor=white)](https://nextjs.org)
 
 ![BardBoard GUI](docs/assets/bardboard.png)
 
